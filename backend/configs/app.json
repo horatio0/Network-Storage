@@ -1,0 +1,7 @@
+{
+  "listenAddr": ":8080",
+  "tailscale": {
+    "enabled": false,
+    "allowedUsers": []
+  }
+}

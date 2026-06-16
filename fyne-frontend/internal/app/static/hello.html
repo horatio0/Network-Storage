@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인터랙티브 3D 카드</title>
+    <style>
+        /* 기본 설정 및 배경 애니메이션 */
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(45deg, #0f2027, #203a43, #2c5364);
+            background-size: 400% 400%;
+            animation: gradientBG 10s ease infinite;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            perspective: 1000px; /* 3D 효과를 위한 원근감 설정 */
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* 반투명 유리 질감 카드 (Glassmorphism) */
+        .card {
+            width: 350px;
+            height: 480px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transform-style: preserve-3d;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            transition: all 0.5s ease;
+        }
+
+        /* 카드 내부 콘텐츠 (Z축으로 띄워서 입체감 부여) */
+        .content {
+            transform: translateZ(80px);
+            text-align: center;
+            pointer-events: none;
+        }
+
+        h2 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+        }
+
+        p {
+            font-size: 1.1em;
+            color: #e0e0e0;
+            font-weight: 300;
+        }
+
+        .btn {
+            margin-top: 40px;
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-radius: 30px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="content">
+            <h2>Hello, World!</h2>
+            <p>마우스를 움직여보세요.</p>
+            <button class="btn">Click</button>
+        </div>
+    </div>
+
+    <script>
+        const card = document.querySelector('.card');
+        const container = document.querySelector('body');
+        
+        // 마우스 이동 시 카드를 회전시키는 이벤트
+        container.addEventListener('mousemove', (e) => {
+            let xAxis = (window.innerWidth / 2 - e.pageX) / 20;
+            let yAxis = (window.innerHeight / 2 - e.pageY) / 20;
+            card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+        });
+
+        // 마우스가 들어올 때 트랜지션 제거 (부드러운 실시간 반응)
+        container.addEventListener('mouseenter', (e) => {
+            card.style.transition = 'none';
+        });
+
+        // 마우스가 화면 밖으로 나갈 때 카드 원래 위치로 복귀
+        container.addEventListener('mouseleave', (e) => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.transform = `rotateY(0deg) rotateX(0deg)`;
+        });
+    </script>
+
+</body>
+</html>
