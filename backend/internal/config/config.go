@@ -7,5 +7,6 @@ type TailscaleConfig struct {
 
 type AppConfig struct {
 	ListenAddr string          `json:"listenAddr"`
+	MountPath  string          `json:"mountPath"`
 	Tailscale  TailscaleConfig `json:"tailscale"`
 }

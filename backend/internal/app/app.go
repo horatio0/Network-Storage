@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"reverseproxy-poc/internal/config"
+	"reverseproxy-poc/internal/files"
 	"reverseproxy-poc/internal/middleware"
 	"reverseproxy-poc/internal/monitor"
 )
@@ -26,6 +28,12 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 		return nil, err
 	}
 
+	if cfg.MountPath != "" {
+		if err := os.MkdirAll(cfg.MountPath, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create mount path: %w", err)
+		}
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	
@@ -33,7 +41,7 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	router.Use(middleware.Logger(logger), gin.Recovery())
 	router.Use(middleware.TailscaleAuth(logger, cfg))
 
-	setupRoutes(router)
+	setupRoutes(router, cfg)
 
 	app := &App{
 		logger:     logger,
@@ -46,7 +54,7 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	return app, nil
 }
 
-func setupRoutes(r *gin.Engine) {
+func setupRoutes(r *gin.Engine, cfg config.AppConfig) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
@@ -71,4 +79,7 @@ func setupRoutes(r *gin.Engine) {
 		}
 		c.JSON(http.StatusOK, status)
 	})
+
+	r.POST("/api/v1/files/upload", files.UploadHandler(cfg.MountPath))
+	r.GET("/api/v1/files/download", files.DownloadHandler(cfg.MountPath))
 }
