@@ -7,17 +7,20 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"reverseproxy-poc/internal/config"
-	"reverseproxy-poc/internal/files"
-	"reverseproxy-poc/internal/middleware"
-	"reverseproxy-poc/internal/monitor"
+	"central-control-backend/internal/config"
+	"central-control-backend/internal/files"
+	"central-control-backend/internal/middleware"
+	"central-control-backend/internal/monitor"
+	"central-control-backend/internal/signaling"
+	"central-control-backend/internal/terminal"
 )
 
 type App struct {
-	logger     *log.Logger
-	configPath string
-	router     *gin.Engine
-	server     *http.Server
+	logger       *log.Logger
+	configPath   string
+	router       *gin.Engine
+	server       *http.Server
+	signalingHub *signaling.Hub
 }
 
 func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, error) {
@@ -41,12 +44,14 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	router.Use(middleware.Logger(logger), gin.Recovery())
 	router.Use(middleware.TailscaleAuth(logger, cfg))
 
-	setupRoutes(router, cfg)
+	sigHub := signaling.NewHub()
+	setupRoutes(router, cfg, sigHub)
 
 	app := &App{
-		logger:     logger,
-		configPath: configPath,
-		router:     router,
+		logger:       logger,
+		configPath:   configPath,
+		router:       router,
+		signalingHub: sigHub,
 	}
 
 	app.server = newServer(cfg.ListenAddr, router)
@@ -54,7 +59,7 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	return app, nil
 }
 
-func setupRoutes(r *gin.Engine, cfg config.AppConfig) {
+func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
@@ -82,4 +87,7 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig) {
 
 	r.POST("/api/v1/files/upload", files.UploadHandler(cfg.MountPath))
 	r.GET("/api/v1/files/download", files.DownloadHandler(cfg.MountPath))
+
+	r.GET("/api/v1/terminal/ws", terminal.Handler)
+	r.GET("/api/v1/signaling/ws", signaling.Handler(sigHub))
 }

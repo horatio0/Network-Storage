@@ -7,12 +7,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"reverseproxy-poc/internal/app"
-	"reverseproxy-poc/internal/config"
+	"central-control-backend/internal/app"
+	"central-control-backend/internal/config"
 )
 
 func main() {
-	logger := log.New(os.Stdout, "[gin-harness] ", log.LstdFlags|log.Lmicroseconds)
+	logger := log.New(os.Stdout, "[central-control] ", log.LstdFlags|log.Lmicroseconds)
 
 	configPath := "configs/app.json"
 	if len(os.Args) > 1 {

@@ -1,8 +1,10 @@
-module reverseproxy-poc
+module central-control-backend
 
 go 1.26.4
 
 require (
+	github.com/coder/websocket v1.8.12
+	github.com/creack/pty v1.1.24
 	github.com/gin-gonic/gin v1.10.0
 	github.com/shirou/gopsutil/v4 v4.26.5
 	tailscale.com v1.100.0
@@ -15,7 +17,6 @@ require (
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
-	github.com/coder/websocket v1.8.12 // indirect
 	github.com/dblohm7/wingoes v0.0.0-20240119213807-a09d6be7affa // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"reverseproxy-poc/internal/config"
+	"central-control-backend/internal/config"
 )
 
 func TestTailscaleAuthDisabled(t *testing.T) {

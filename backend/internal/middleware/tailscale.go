@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"reverseproxy-poc/internal/config"
+	"central-control-backend/internal/config"
 	"tailscale.com/client/tailscale"
 )
 
