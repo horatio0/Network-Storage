@@ -1,6 +1,6 @@
 {
   "listenAddr": ":8080",
-  "mountPath": "tmp_mount",
+  "mountPath": "/NS/share",
   "tailscale": {
     "enabled": true,
     "allowedUsers": []

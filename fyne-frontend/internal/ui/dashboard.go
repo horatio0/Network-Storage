@@ -15,11 +15,11 @@ import (
 )
 
 var (
-	lastMonErr     string
-	lastMonErrTime time.Time
-	cpuChart       *lineChart
-	memChart       *lineChart
-	tempChart      *lineChart
+	lastMonErr  string
+	lastLogTime time.Time
+	cpuChart    *lineChart
+	memChart    *lineChart
+	tempChart   *lineChart
 )
 
 func createMainView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
@@ -66,7 +66,9 @@ func updateMountBtn(a fyne.App, btn *widget.Button) {
 }
 
 func executeMount(a fyne.App, btn *widget.Button) {
-	ip, share, local := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("share_name", "shared"), a.Preferences().StringWithFallback("mount_path", "")
+	ip := a.Preferences().StringWithFallback("server_ip", "")
+	share := a.Preferences().StringWithFallback("share_name", "/NS/share")
+	local := a.Preferences().StringWithFallback("mount_path", "")
 	if err := client.MountDrive(ip, share, local); err != nil {
 		AddLog(a, "Mount Error: "+err.Error())
 	} else {
@@ -125,15 +127,18 @@ func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBo
 }
 
 func logMonitorErr(a fyne.App, e string) {
-	if lastMonErr != e || time.Since(lastMonErrTime) > 10*time.Second {
-		fyne.Do(func() {
+	fyne.Do(func() {
+		if lastMonErr != e {
 			AddLog(a, "Monitor Error: "+e)
+			lastLogTime = time.Now()
 			noti := fyne.NewNotification("Error", "에러가 발생했습니다. Logs탭에서 확인해 주세요")
 			a.SendNotification(noti)
-		})
-		lastMonErr = e
-		lastMonErrTime = time.Now()
-	}
+			lastMonErr = e
+		} else if time.Since(lastLogTime) > 10*time.Second {
+			AddLog(a, "Monitor Error: "+e)
+			lastLogTime = time.Now()
+		}
+	})
 }
 
 func updateLabels(s *client.SystemStatus, cpu, mem, temp *widget.Label) {

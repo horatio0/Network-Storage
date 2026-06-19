@@ -45,13 +45,13 @@ func setupLogCallback(a fyne.App, contentArea *fyne.Container, c *client.HTTPCli
 }
 
 func createSidebar(a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
-	titles := []string{"Main", "Logs", "Files", "Terminal", "Screen", "Settings"}
-	sidebarTabs = make([]*SidebarTab, 6)
+	titles := []string{"Main", "Logs", "Files", "Terminal", "Screen", "Lock App", "Settings"}
+	sidebarTabs = make([]*SidebarTab, 7)
 	for i, t := range titles {
 		sidebarTabs[i] = buildTabItem(t, i, a, cArea, c, w)
 	}
 	topBox := container.NewVBox(sidebarTabs[0].Container, sidebarTabs[1].Container, sidebarTabs[2].Container, sidebarTabs[3].Container, sidebarTabs[4].Container)
-	botBox := container.NewVBox(widget.NewSeparator(), sidebarTabs[5].Container)
+	botBox := container.NewVBox(widget.NewSeparator(), sidebarTabs[5].Container, sidebarTabs[6].Container)
 	sidebar := container.NewBorder(nil, botBox, nil, nil, topBox)
 	return container.NewBorder(nil, nil, nil, widget.NewSeparator(), sidebar)
 }
@@ -90,6 +90,11 @@ func applyTabStyle(i, selected int, bg *canvas.Rectangle, lbl *canvas.Text, dot 
 }
 
 func handleSidebarSelect(idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
+	if idx == 5 {
+		w.SetContent(createLockView(a, w, w.Content()))
+		updateSidebarState(currentTab)
+		return
+	}
 	currentTab = idx
 	if idx == 1 {
 		HasNewLogs = false
@@ -125,7 +130,7 @@ func loadViewForTabRight(idx int, a fyne.App, cArea *fyne.Container, c *client.H
 		cArea.Add(createScreenView(a, c, w))
 		return
 	}
-	if idx == 5 {
+	if idx == 6 {
 		cArea.Add(createSettingsView(a))
 		return
 	}
