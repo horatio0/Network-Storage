@@ -141,3 +141,43 @@ func ListHandler(mountPath string) gin.HandlerFunc {
 		c.JSON(http.StatusOK, files)
 	}
 }
+
+func MkdirHandler(mountPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reqPath := c.Query("path")
+		if reqPath == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "path query parameter is required"})
+			return
+		}
+		targetPath, err := resolveSafePath(mountPath, reqPath)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "invalid path"})
+			return
+		}
+		if err := os.MkdirAll(targetPath, 0755); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "directory created successfully"})
+	}
+}
+
+func DeleteHandler(mountPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reqPath := c.Query("path")
+		if reqPath == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "path query parameter is required"})
+			return
+		}
+		targetPath, err := resolveSafePath(mountPath, reqPath)
+		if err != nil || targetPath == filepath.Clean(mountPath) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "invalid or forbidden path"})
+			return
+		}
+		if err := os.RemoveAll(targetPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "deleted successfully"})
+	}
+}

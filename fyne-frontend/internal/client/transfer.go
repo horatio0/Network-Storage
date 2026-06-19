@@ -78,3 +78,17 @@ func saveResponse(resp *http.Response, savePath string) error {
 	_, err = io.Copy(out, resp.Body)
 	return err
 }
+
+func Mkdir(c *HTTPClient, ip, port, path string) error {
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/mkdir?path=%s", ip, port, url.QueryEscape(path))
+	req, _ := http.NewRequest("POST", u, nil)
+	_, err := c.DoRequest(req)
+	return err
+}
+
+func DeletePath(c *HTTPClient, ip, port, path string) error {
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/delete?path=%s", ip, port, url.QueryEscape(path))
+	req, _ := http.NewRequest("DELETE", u, nil)
+	_, err := c.DoRequest(req)
+	return err
+}
