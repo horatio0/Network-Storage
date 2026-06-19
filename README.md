@@ -91,8 +91,8 @@ go run main.go
 ```mermaid
 graph LR
     subgraph Tailscale VPN 
-        Client[Desktop App\n(Fyne GUI)] <-->|HTTP/WS\nEncrypted| Backend[Backend Server\n(Gin API)]
-        Client <-->|WebRTC P2P\nDirect Stream| Client2[Other Clients]
-        Client <-->|SMB/NFS\nDirect Mount| BackendFS[Shared Directory]
+        Client["Desktop App<br>(Fyne GUI)"] <-->|"HTTP/WS<br>Encrypted"| Backend["Backend Server<br>(Gin API)"]
+        Client <-->|"WebRTC P2P<br>Direct Stream"| Client2["Other Clients"]
+        Client <-->|"SMB/NFS<br>Direct Mount"| BackendFS["Shared Directory"]
     end
 ```
