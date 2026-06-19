@@ -44,14 +44,15 @@ func setupLogCallback(a fyne.App, contentArea *fyne.Container, c *client.HTTPCli
 }
 
 func createSidebar(a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
-	titles := []string{"Main", "Logs", "Files", "Settings"}
-	sidebarTabs = make([]*SidebarTab, 4)
+	titles := []string{"Main", "Logs", "Files", "Terminal", "Settings"}
+	sidebarTabs = make([]*SidebarTab, 5)
 	for i, t := range titles {
 		sidebarTabs[i] = buildTabItem(t, i, a, cArea, c, w)
 	}
-	topBox := container.NewVBox(sidebarTabs[0].Container, sidebarTabs[1].Container, sidebarTabs[2].Container)
-	botBox := container.NewVBox(widget.NewSeparator(), sidebarTabs[3].Container)
-	return container.NewBorder(nil, botBox, nil, nil, topBox)
+	topBox := container.NewVBox(sidebarTabs[0].Container, sidebarTabs[1].Container, sidebarTabs[2].Container, sidebarTabs[3].Container)
+	botBox := container.NewVBox(widget.NewSeparator(), sidebarTabs[4].Container)
+	sidebar := container.NewBorder(nil, botBox, nil, nil, topBox)
+	return container.NewBorder(nil, nil, nil, widget.NewSeparator(), sidebar)
 }
 
 func buildTabItem(t string, idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) *SidebarTab {
@@ -101,12 +102,14 @@ func handleSidebarSelect(idx int, a fyne.App, cArea *fyne.Container, c *client.H
 func loadViewForTab(idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
 	switch idx {
 	case 0:
-		cArea.Add(createMainView(a, c))
+		cArea.Add(createMainView(a, c, w))
 	case 1:
 		cArea.Add(createLogsView(a, nil))
 	case 2:
 		cArea.Add(createFilesView(a, c, w))
 	case 3:
+		cArea.Add(createTerminalView(a, w))
+	case 4:
 		cArea.Add(createSettingsView(a))
 	}
 }

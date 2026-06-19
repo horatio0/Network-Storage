@@ -2,12 +2,16 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"time"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 	"reverseproxy-poc/internal/client"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/widget"
 )
 
 var (
@@ -18,7 +22,7 @@ var (
 	tempChart      *lineChart
 )
 
-func createMainView(a fyne.App, c *client.HTTPClient) fyne.CanvasObject {
+func createMainView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
 	cpuLbl := widget.NewLabel("CPU: - %")
 	memLbl := widget.NewLabel("Mem: - GB")
 	tempLbl := widget.NewLabel("Temp: - °C")
@@ -29,18 +33,25 @@ func createMainView(a fyne.App, c *client.HTTPClient) fyne.CanvasObject {
 	mBtn := widget.NewButton("", nil)
 	updateMountBtn(a, mBtn)
 
-	go startDashboardLoop(a, c, cpuLbl, memLbl, tempLbl)
-	return buildMainUI(cpuLbl, memLbl, tempLbl, mBtn)
+	devBox := container.NewVBox()
+	go startDashboardLoop(a, c, cpuLbl, memLbl, tempLbl, devBox, w)
+	return buildMainUI(cpuLbl, memLbl, tempLbl, mBtn, devBox)
 }
 
-func buildMainUI(cpu, mem, temp *widget.Label, mBtn *widget.Button) fyne.CanvasObject {
+func buildMainUI(cpu, mem, temp *widget.Label, mBtn *widget.Button, devBox *fyne.Container) fyne.CanvasObject {
 	title := widget.NewLabelWithStyle("Main Dashboard", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	cpuBox := container.NewBorder(cpu, nil, nil, nil, cpuChart)
 	memBox := container.NewBorder(mem, nil, nil, nil, memChart)
 	tempBox := container.NewBorder(temp, nil, nil, nil, tempChart)
 	grid := container.NewGridWithColumns(3, cpuBox, memBox, tempBox)
 	card := widget.NewCard("Status", "", grid)
-	return container.NewPadded(container.NewVBox(title, mBtn, card))
+
+	bg := canvas.NewRectangle(color.NRGBA{R: 20, G: 20, B: 20, A: 255})
+	devScroll := container.NewPadded(container.NewScroll(devBox))
+	devCard := widget.NewCard("Connected Devices", "", container.NewStack(bg, devScroll))
+
+	top := container.NewVBox(title, mBtn)
+	return container.NewPadded(container.NewBorder(top, card, nil, nil, devCard))
 }
 
 func updateMountBtn(a fyne.App, btn *widget.Button) {
@@ -76,20 +87,27 @@ func executeUnmount(a fyne.App, btn *widget.Button) {
 	}
 }
 
-func startDashboardLoop(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label) {
+func startDashboardLoop(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		updateDashboardData(a, c, cpu, mem, temp)
+		updateDashboardData(a, c, cpu, mem, temp, devBox, w)
 	}
 }
 
-func updateDashboardData(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label) {
-	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
+func updateDashboardData(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
+	ip := a.Preferences().StringWithFallback("server_ip", "")
+	port := a.Preferences().StringWithFallback("server_port", "8080")
 	if ip == "" {
 		logMonitorErr(a, "Please set Server IP")
 		return
 	}
+
+	fetchAndUpdateStats(a, c, ip, port, cpu, mem, temp)
+	fetchAndUpdateDevs(a, c, ip, port, devBox, w)
+}
+
+func fetchAndUpdateStats(a fyne.App, c *client.HTTPClient, ip, port string, cpu, mem, temp *widget.Label) {
 	s, err := client.FetchSystemStatus(c, ip, port)
 	if err != nil {
 		logMonitorErr(a, err.Error())
@@ -97,6 +115,13 @@ func updateDashboardData(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widge
 	}
 	lastMonErr = ""
 	updateLabels(s, cpu, mem, temp)
+}
+
+func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBox *fyne.Container, w fyne.Window) {
+	devs, _ := client.FetchDevices(c, ip, port)
+	if devs != nil {
+		updateDevices(a, devBox, devs, w)
+	}
 }
 
 func logMonitorErr(a fyne.App, e string) {
@@ -118,4 +143,40 @@ func updateLabels(s *client.SystemStatus, cpu, mem, temp *widget.Label) {
 		memChart.appendData(s.MemPercent)
 		tempChart.appendData(s.Temp)
 	})
+}
+
+func updateDevices(a fyne.App, devBox *fyne.Container, devs []client.Device, w fyne.Window) {
+	fyne.Do(func() {
+		var objects []fyne.CanvasObject
+		for i, d := range devs {
+			objects = append(objects, buildDeviceRow(a, i, d, w))
+		}
+		devBox.Objects = objects
+		devBox.Refresh()
+	})
+}
+
+func buildDeviceRow(a fyne.App, i int, d client.Device, w fyne.Window) fyne.CanvasObject {
+	ipStr := ""
+	if len(d.IPs) > 0 {
+		ipStr = d.IPs[0]
+	}
+	key := "alias_" + ipStr
+	alias := a.Preferences().StringWithFallback(key, fmt.Sprintf("device%d", i+1))
+
+	lbl := canvas.NewText(fmt.Sprintf("%s [%s] %s", d.OS, ipStr, alias), color.White)
+	btn := widget.NewButton("✏️", nil)
+	btn.OnTapped = func() { promptAlias(a, key, alias, w) }
+
+	return container.NewBorder(nil, nil, nil, btn, lbl)
+}
+
+func promptAlias(a fyne.App, key, alias string, w fyne.Window) {
+	entry := widget.NewEntry()
+	entry.SetText(alias)
+	dialog.ShowCustomConfirm("Edit Alias", "Save", "Cancel", entry, func(b bool) {
+		if b {
+			a.Preferences().SetString(key, entry.Text)
+		}
+	}, w)
 }
