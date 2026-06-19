@@ -2,59 +2,111 @@ package ui
 
 import (
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"image/color"
 	"reverseproxy-poc/internal/client"
 )
 
-// SetupMainWindow configures the split layout with a sidebar.
+type SidebarTab struct {
+	Container *fyne.Container
+	Bg        *canvas.Rectangle
+	Lbl       *canvas.Text
+	Dot       *canvas.Circle
+}
+
+var (
+	sidebarTabs []*SidebarTab
+	currentTab  int
+)
+
 func SetupMainWindow(a fyne.App, w fyne.Window, c *client.HTTPClient) {
 	contentArea := container.NewMax()
-	contentArea.Objects = []fyne.CanvasObject{
-		createDashboardView(a, c),
-	}
-
 	sidebar := createSidebar(a, contentArea, c, w)
-	split := container.NewHSplit(sidebar, contentArea)
-	split.Offset = 0.2
-
-	w.SetContent(split)
+	setupLogCallback(a, contentArea, c, w)
+	handleSidebarSelect(0, a, contentArea, c, w)
+	mainLayout := container.NewBorder(nil, nil, sidebar, nil, contentArea)
+	w.SetContent(mainLayout)
 }
 
-func createSidebar(a fyne.App, contentArea *fyne.Container, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
-	menuList := widget.NewList(
-		func() int { return 3 },
-		func() fyne.CanvasObject { return widget.NewLabel("Menu Item") },
-		func(i widget.ListItemID, o fyne.CanvasObject) { updateSidebarItem(i, o) },
-	)
-	menuList.OnSelected = func(id widget.ListItemID) { handleSidebarSelect(a, id, contentArea, c, w) }
-	menuList.Select(0)
-
-	title := widget.NewLabelWithStyle("Control Panel", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	return container.NewBorder(title, nil, nil, nil, menuList)
-}
-
-func updateSidebarItem(i widget.ListItemID, o fyne.CanvasObject) {
-	lbl := o.(*widget.Label)
-	switch i {
-	case 0:
-		lbl.SetText("Dashboard")
-	case 1:
-		lbl.SetText("Settings")
-	case 2:
-		lbl.SetText("Files")
+func setupLogCallback(a fyne.App, contentArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
+	OnLogAdded = func() {
+		fyne.Do(func() {
+			updateSidebarState(currentTab)
+			if currentTab == 1 {
+				contentArea.Objects = nil
+				loadViewForTab(1, a, contentArea, c, w)
+				contentArea.Refresh()
+			}
+		})
 	}
 }
 
-func handleSidebarSelect(a fyne.App, id widget.ListItemID, contentArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
-	contentArea.Objects = nil
-	switch id {
-	case 0:
-		contentArea.Add(createDashboardView(a, c))
-	case 1:
-		contentArea.Add(createSettingsView(a))
-	case 2:
-		contentArea.Add(createFilesView(a, c, w))
+func createSidebar(a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
+	titles := []string{"Main", "Logs", "Files", "Settings"}
+	sidebarTabs = make([]*SidebarTab, 4)
+	for i, t := range titles {
+		sidebarTabs[i] = buildTabItem(t, i, a, cArea, c, w)
 	}
-	contentArea.Refresh()
+	topBox := container.NewVBox(sidebarTabs[0].Container, sidebarTabs[1].Container, sidebarTabs[2].Container)
+	botBox := container.NewVBox(widget.NewSeparator(), sidebarTabs[3].Container)
+	return container.NewBorder(nil, botBox, nil, nil, topBox)
+}
+
+func buildTabItem(t string, idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) *SidebarTab {
+	bg := canvas.NewRectangle(color.Transparent)
+	lbl := canvas.NewText(t, color.White)
+
+	dot := canvas.NewCircle(color.NRGBA{R: 255, A: 255})
+	dotCont := container.NewGridWrap(fyne.NewSize(6, 6), dot)
+	hbox := container.NewHBox(lbl, container.NewCenter(dotCont))
+
+	tap := newTappable(func() { handleSidebarSelect(idx, a, cArea, c, w) })
+	cont := container.NewStack(bg, container.NewPadded(hbox), tap)
+	return &SidebarTab{Container: cont, Bg: bg, Lbl: lbl, Dot: dot}
+}
+
+func updateSidebarState(selected int) {
+	for i, tab := range sidebarTabs {
+		applyTabStyle(i, selected, tab.Bg, tab.Lbl, tab.Dot)
+		tab.Container.Refresh()
+	}
+}
+
+func applyTabStyle(i, selected int, bg *canvas.Rectangle, lbl *canvas.Text, dot *canvas.Circle) {
+	dot.Hide()
+	bg.FillColor = color.Transparent
+	lbl.Color = color.NRGBA{R: 150, G: 150, B: 150, A: 255}
+	if i == selected {
+		bg.FillColor = color.NRGBA{R: 50, G: 50, B: 50, A: 255}
+		lbl.Color = color.White
+	}
+	if i == 1 && HasNewLogs {
+		dot.Show()
+	}
+}
+
+func handleSidebarSelect(idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
+	currentTab = idx
+	if idx == 1 {
+		HasNewLogs = false
+	}
+	updateSidebarState(idx)
+	cArea.Objects = nil
+	loadViewForTab(idx, a, cArea, c, w)
+	cArea.Refresh()
+}
+
+func loadViewForTab(idx int, a fyne.App, cArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
+	switch idx {
+	case 0:
+		cArea.Add(createMainView(a, c))
+	case 1:
+		cArea.Add(createLogsView(a, nil))
+	case 2:
+		cArea.Add(createFilesView(a, c, w))
+	case 3:
+		cArea.Add(createSettingsView(a))
+	}
 }

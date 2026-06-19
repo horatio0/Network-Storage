@@ -2,13 +2,36 @@ package client
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 )
+
+type FileInfo struct {
+	Name    string `json:"name"`
+	IsDir   bool   `json:"isDir"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"modTime"`
+}
+
+func ListFiles(c *HTTPClient, ip, port, path string) ([]FileInfo, error) {
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/list?path=%s", ip, port, url.QueryEscape(path))
+	req, _ := http.NewRequest("GET", u, nil)
+	body, err := c.DoRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	var list []FileInfo
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
 
 func UploadFile(c *HTTPClient, ip, port, filePath string) error {
 	file, err := os.Open(filePath)
@@ -25,16 +48,16 @@ func UploadFile(c *HTTPClient, ip, port, filePath string) error {
 }
 
 func executeUpload(c *HTTPClient, ip, port string, body io.Reader, ct string) error {
-	url := fmt.Sprintf("http://%s:%s/api/v1/files/upload", ip, port)
-	req, _ := http.NewRequest("POST", url, body)
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/upload", ip, port)
+	req, _ := http.NewRequest("POST", u, body)
 	req.Header.Set("Content-Type", ct)
 	_, err := c.DoRequest(req)
 	return err
 }
 
 func DownloadFile(c *HTTPClient, ip, port, filename, savePath string) error {
-	url := fmt.Sprintf("http://%s:%s/api/v1/files/download?filename=%s", ip, port, filename)
-	req, _ := http.NewRequest("GET", url, nil)
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/download?filename=%s", ip, port, filename)
+	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err
