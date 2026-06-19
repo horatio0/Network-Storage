@@ -12,6 +12,7 @@ import (
 	"central-control-backend/internal/middleware"
 	"central-control-backend/internal/monitor"
 	"central-control-backend/internal/signaling"
+	"central-control-backend/internal/tailscale"
 	"central-control-backend/internal/terminal"
 )
 
@@ -91,4 +92,5 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub) {
 
 	r.GET("/api/v1/terminal/ws", terminal.Handler)
 	r.GET("/api/v1/signaling/ws", signaling.Handler(sigHub))
+	r.GET("/api/v1/tailscale/devices", tailscale.GetDevicesHandler)
 }
