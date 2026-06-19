@@ -87,6 +87,7 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub) {
 
 	r.POST("/api/v1/files/upload", files.UploadHandler(cfg.MountPath))
 	r.GET("/api/v1/files/download", files.DownloadHandler(cfg.MountPath))
+	r.GET("/api/v1/files/list", files.ListHandler(cfg.MountPath))
 
 	r.GET("/api/v1/terminal/ws", terminal.Handler)
 	r.GET("/api/v1/signaling/ws", signaling.Handler(sigHub))

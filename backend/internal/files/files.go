@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -79,5 +81,63 @@ func DownloadHandler(mountPath string) gin.HandlerFunc {
 		}
 
 		c.File(targetPath)
+	}
+}
+
+type FileInfo struct {
+	Name    string    `json:"name"`
+	IsDir   bool      `json:"isDir"`
+	Size    int64     `json:"size"`
+	ModTime time.Time `json:"modTime"`
+}
+
+func resolveSafePath(mountPath, reqPath string) (string, error) {
+	cleanPath := filepath.Clean("/" + reqPath)
+	target := filepath.Join(mountPath, cleanPath)
+	if !strings.HasPrefix(target, filepath.Clean(mountPath)) {
+		return "", os.ErrPermission
+	}
+	return target, nil
+}
+
+func readDirAsJSON(targetPath string) ([]FileInfo, error) {
+	entries, err := os.ReadDir(targetPath)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		result = append(result, FileInfo{
+			Name:    entry.Name(),
+			IsDir:   entry.IsDir(),
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+		})
+	}
+	return result, nil
+}
+
+func ListHandler(mountPath string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		reqPath := c.Query("path")
+		targetPath, err := resolveSafePath(mountPath, reqPath)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "invalid path"})
+			return
+		}
+		files, err := readDirAsJSON(targetPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "directory not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read directory"})
+			return
+		}
+		c.JSON(http.StatusOK, files)
 	}
 }
