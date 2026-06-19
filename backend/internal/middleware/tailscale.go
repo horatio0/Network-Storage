@@ -12,10 +12,10 @@ import (
 func TailscaleAuth(logger *log.Logger, cfg config.AppConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		clientIP := c.ClientIP()
-		whois, err := tailscale.WhoIs(c.Request.Context(), clientIP)
+		remoteAddr := c.Request.RemoteAddr
+		whois, err := tailscale.WhoIs(c.Request.Context(), remoteAddr)
 		if err != nil {
-			logger.Printf("Tailscale Auth failed for %s: %v", clientIP, err)
+			logger.Printf("Tailscale Auth failed for %s: %v", remoteAddr, err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Not on Tailscale"})
 			return
 		}
@@ -29,7 +29,7 @@ func TailscaleAuth(logger *log.Logger, cfg config.AppConfig) gin.HandlerFunc {
 				}
 			}
 			if !allowed {
-				logger.Printf("Tailscale Auth forbidden for user %s (%s)", whois.UserProfile.LoginName, clientIP)
+				logger.Printf("Tailscale Auth forbidden for user %s (%s)", whois.UserProfile.LoginName, remoteAddr)
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Forbidden: User not allowed"})
 				return
 			}

@@ -37,8 +37,9 @@ func Handler(c *gin.Context) {
 		_ = cmd.Process.Kill()
 	}()
 
-	go io.Copy(f, websocket.NetConn(ctx, conn, websocket.MessageBinary))
-	_, _ = io.Copy(websocket.NetConn(ctx, conn, websocket.MessageBinary), f)
+	wsConn := websocket.NetConn(ctx, conn, websocket.MessageBinary)
+	go io.Copy(f, wsConn)
+	_, _ = io.Copy(wsConn, f)
 }
 
 func getShell() string {

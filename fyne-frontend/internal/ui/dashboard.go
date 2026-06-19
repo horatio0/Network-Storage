@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"time"
 
-	"reverseproxy-poc/internal/client"
+	"network-storage-client/internal/client"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"

@@ -43,7 +43,7 @@ func TestUploadDownloadFlow(t *testing.T) {
 	})
 
 	t.Run("download successfully", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/download?filename=test.txt", nil)
+		req := httptest.NewRequest(http.MethodGet, "/download?path=test.txt", nil)
 		resp := httptest.NewRecorder()
 
 		router.ServeHTTP(resp, req)
@@ -58,10 +58,8 @@ func TestUploadDownloadFlow(t *testing.T) {
 	})
 
 	t.Run("path traversal attempt download", func(t *testing.T) {
-		// Even if they pass ../test.txt, filepath.Base will reduce it to test.txt
-		// We can test that it still finds test.txt or errors appropriately if we didn't exist.
-		// Let's test a non-existent file path traversal.
-		req := httptest.NewRequest(http.MethodGet, "/download?filename=../../../etc/passwd", nil)
+		// With our resolveSafePath, it attempts to read tmpDir/etc/passwd, which doesn't exist.
+		req := httptest.NewRequest(http.MethodGet, "/download?path=../../../etc/passwd", nil)
 		resp := httptest.NewRecorder()
 
 		router.ServeHTTP(resp, req)

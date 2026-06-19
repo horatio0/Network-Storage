@@ -1,6 +1,6 @@
 package main
 
-import "reverseproxy-poc/internal/ui"
+import "network-storage-client/internal/ui"
 
 func main() {
 	ui.RunApp()

@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,30 +32,37 @@ func ListFiles(c *HTTPClient, ip, port, path string) ([]FileInfo, error) {
 	return list, nil
 }
 
-func UploadFile(c *HTTPClient, ip, port, filePath string) error {
+func UploadFile(c *HTTPClient, ip, port, filePath, targetPath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	body := &bytes.Buffer{}
-	w := multipart.NewWriter(body)
-	part, _ := w.CreateFormFile("file", filepath.Base(filePath))
-	io.Copy(part, file)
-	w.Close()
-	return executeUpload(c, ip, port, body, w.FormDataContentType())
+	pr, pw := io.Pipe()
+	w := multipart.NewWriter(pw)
+	go streamUpload(file, pw, w, filePath)
+	return sendUploadReq(c, pr, w.FormDataContentType(), ip, port, targetPath)
 }
 
-func executeUpload(c *HTTPClient, ip, port string, body io.Reader, ct string) error {
-	u := fmt.Sprintf("http://%s:%s/api/v1/files/upload", ip, port)
-	req, _ := http.NewRequest("POST", u, body)
+func streamUpload(file *os.File, pw *io.PipeWriter, w *multipart.Writer, filePath string) {
+	defer file.Close()
+	defer pw.Close()
+	part, err := w.CreateFormFile("file", filepath.Base(filePath))
+	if err == nil {
+		io.Copy(part, file)
+	}
+	w.Close()
+}
+
+func sendUploadReq(c *HTTPClient, pr io.Reader, ct, ip, port, target string) error {
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/upload?path=%s", ip, port, url.QueryEscape(target))
+	req, _ := http.NewRequest("POST", u, pr)
 	req.Header.Set("Content-Type", ct)
 	_, err := c.DoRequest(req)
 	return err
 }
 
-func DownloadFile(c *HTTPClient, ip, port, filename, savePath string) error {
-	u := fmt.Sprintf("http://%s:%s/api/v1/files/download?filename=%s", ip, port, filename)
+func DownloadFile(c *HTTPClient, ip, port, path, savePath string) error {
+	u := fmt.Sprintf("http://%s:%s/api/v1/files/download?path=%s", ip, port, url.QueryEscape(path))
 	req, _ := http.NewRequest("GET", u, nil)
 	resp, err := c.client.Do(req)
 	if err != nil {

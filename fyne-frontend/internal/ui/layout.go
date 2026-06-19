@@ -2,7 +2,7 @@ package ui
 
 import (
 	"image/color"
-	"reverseproxy-poc/internal/client"
+	"network-storage-client/internal/client"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"

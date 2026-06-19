@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"reverseproxy-poc/internal/client"
+	"network-storage-client/internal/client"
 )
 
 var currentPath string = "/"
@@ -115,12 +115,12 @@ func triggerUpload(a fyne.App, c *client.HTTPClient, w fyne.Window) {
 		if err != nil || reader == nil {
 			return
 		}
-		go uploadWorker(a, c, ip, port, reader.URI().Path())
+		go uploadWorker(a, c, ip, port, reader.URI().Path(), currentPath)
 	}, w)
 }
 
-func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path string) {
-	err := client.UploadFile(c, ip, port, path)
+func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir string) {
+	err := client.UploadFile(c, ip, port, path, targetDir)
 	fyne.Do(func() {
 		if err != nil {
 			AddLog(a, "Upload Error: "+err.Error())
@@ -134,7 +134,13 @@ func triggerDownload(a fyne.App, c *client.HTTPClient, filename string) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	home, _ := os.UserHomeDir()
 	savePath := filepath.Join(home, "Downloads", filename)
-	go downloadWorker(a, c, ip, port, filename, savePath)
+	target := currentPath
+	if target == "/" {
+		target = "/" + filename
+	} else {
+		target = target + "/" + filename
+	}
+	go downloadWorker(a, c, ip, port, target, savePath)
 }
 
 func downloadWorker(a fyne.App, c *client.HTTPClient, ip, port, file, save string) {

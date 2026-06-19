@@ -13,6 +13,13 @@ import (
 
 func UploadHandler(mountPath string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		reqPath := c.Query("path")
+		targetDir, err := resolveSafePath(mountPath, reqPath)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "invalid path"})
+			return
+		}
+
 		reader, err := c.Request.MultipartReader()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read multipart"})
@@ -35,7 +42,7 @@ func UploadHandler(mountPath string) gin.HandlerFunc {
 					return
 				}
 
-				dst := filepath.Join(mountPath, filename)
+				dst := filepath.Join(targetDir, filename)
 				out, err := os.Create(dst)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create file"})
@@ -61,19 +68,17 @@ func UploadHandler(mountPath string) gin.HandlerFunc {
 
 func DownloadHandler(mountPath string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		queryFilename := c.Query("filename")
-		if queryFilename == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "filename query parameter is required"})
+		reqPath := c.Query("path")
+		if reqPath == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "path query parameter is required"})
 			return
 		}
 
-		safeFilename := filepath.Base(queryFilename)
-		if safeFilename == "." || safeFilename == "/" || safeFilename == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+		targetPath, err := resolveSafePath(mountPath, reqPath)
+		if err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "invalid path"})
 			return
 		}
-
-		targetPath := filepath.Join(mountPath, safeFilename)
 
 		if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})

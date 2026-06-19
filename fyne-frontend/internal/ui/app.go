@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"reverseproxy-poc/internal/client"
-	"reverseproxy-poc/internal/webrtc"
+	"network-storage-client/internal/client"
+	"network-storage-client/internal/webrtc"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"

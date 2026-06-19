@@ -1,4 +1,4 @@
-module reverseproxy-poc
+module network-storage-client
 
 go 1.24
 

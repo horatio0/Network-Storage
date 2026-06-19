@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"reverseproxy-poc/internal/config"
-	"reverseproxy-poc/internal/middleware"
+	"network-storage-client/internal/config"
+	"network-storage-client/internal/middleware"
 )
 
 type App struct {
