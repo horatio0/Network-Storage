@@ -126,7 +126,11 @@ func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBo
 
 func logMonitorErr(a fyne.App, e string) {
 	if lastMonErr != e || time.Since(lastMonErrTime) > 10*time.Second {
-		fyne.Do(func() { AddLog(a, "Monitor Error: "+e) })
+		fyne.Do(func() {
+			AddLog(a, "Monitor Error: "+e)
+			noti := fyne.NewNotification("Error", "에러가 발생했습니다. Logs탭에서 확인해 주세요")
+			a.SendNotification(noti)
+		})
 		lastMonErr = e
 		lastMonErrTime = time.Now()
 	}

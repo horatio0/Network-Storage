@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v3"
@@ -20,14 +21,15 @@ type Controller struct {
 	target  string
 	isHost  bool
 	onFrame func([]byte)
+	onError func(error)
 }
 
-func NewController(url, tgt string, host bool, cb func([]byte)) (*Controller, error) {
+func NewController(url, tgt string, host bool, cb func([]byte), errCb func(error)) (*Controller, error) {
 	ws, err := dialWebsocket(url)
 	if err != nil {
 		return nil, err
 	}
-	c := &Controller{ws: ws, target: tgt, isHost: host, onFrame: cb}
+	c := &Controller{ws: ws, target: tgt, isHost: host, onFrame: cb, onError: errCb}
 	return initController(c)
 }
 
@@ -38,9 +40,18 @@ func initController(c *Controller) (*Controller, error) {
 		return nil, err
 	}
 	c.pc = pc
+	setupStateChange(c)
 	setupIceHandler(c)
 	setupDataChannel(c)
 	return c, nil
+}
+
+func setupStateChange(c *Controller) {
+	c.pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
+		if s == webrtc.PeerConnectionStateFailed && c.onError != nil {
+			c.onError(fmt.Errorf("state: %s", s))
+		}
+	})
 }
 
 func dialWebsocket(url string) (*websocket.Conn, error) {

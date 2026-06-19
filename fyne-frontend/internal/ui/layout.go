@@ -1,12 +1,13 @@
 package ui
 
 import (
+	"image/color"
+	"reverseproxy-poc/internal/client"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"image/color"
-	"reverseproxy-poc/internal/client"
 )
 
 type SidebarTab struct {
@@ -121,7 +122,7 @@ func loadViewForTabRight(idx int, a fyne.App, cArea *fyne.Container, c *client.H
 		return
 	}
 	if idx == 4 {
-		cArea.Add(createScreenView(a, c))
+		cArea.Add(createScreenView(a, c, w))
 		return
 	}
 	if idx == 5 {

@@ -11,26 +11,27 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
 var rtc *webrtc.Controller
 var hostMap map[string]string
 
-func createScreenView(a fyne.App, c *client.HTTPClient) fyne.CanvasObject {
+func createScreenView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
 	bg := canvas.NewRectangle(color.NRGBA{R: 10, G: 10, B: 10, A: 255})
 	viewer := canvas.NewImageFromResource(nil)
 	viewer.FillMode = canvas.ImageFillContain
 
 	sel := widget.NewSelect([]string{"Loading..."}, nil)
 	go loadScreenDevices(a, c, sel)
-	return buildScreenLayout(a, sel, bg, viewer)
+	return buildScreenLayout(a, sel, bg, viewer, w)
 }
 
-func buildScreenLayout(a fyne.App, s *widget.Select, bg *canvas.Rectangle, v *canvas.Image) fyne.CanvasObject {
+func buildScreenLayout(a fyne.App, s *widget.Select, bg *canvas.Rectangle, v *canvas.Image, w fyne.Window) fyne.CanvasObject {
 	selBox := container.NewGridWrap(fyne.NewSize(300, 36), s)
 	btn := widget.NewButton("View Remote Screen", func() {
-		startRtc(a, hostMap[s.Selected], false, buildFrameCb(v))
+		startRtc(a, w, hostMap[s.Selected], false, buildFrameCb(v))
 	})
 	top := container.NewHBox(widget.NewLabel("Target:"), selBox, btn)
 	return container.NewBorder(top, nil, nil, nil, container.NewStack(bg, v))
@@ -76,7 +77,7 @@ func buildFrameCb(v *canvas.Image) func([]byte) {
 	}
 }
 
-func startRtc(a fyne.App, target string, isHost bool, onFrame func([]byte)) {
+func startRtc(a fyne.App, w fyne.Window, target string, isHost bool, onFrame func([]byte)) {
 	if rtc != nil || target == "" {
 		return
 	}
@@ -85,14 +86,21 @@ func startRtc(a fyne.App, target string, isHost bool, onFrame func([]byte)) {
 	if ip == "" {
 		return
 	}
-	startRtcController(a, ip, port, target, isHost, onFrame)
+	startRtcController(a, w, ip, port, target, isHost, onFrame)
 }
 
-func startRtcController(a fyne.App, ip, port, tgt string, host bool, cb func([]byte)) {
+func startRtcController(a fyne.App, w fyne.Window, ip, port, tgt string, host bool, cb func([]byte)) {
 	url := fmt.Sprintf("ws://%s:%s/api/v1/signaling/ws", ip, port)
-	c, err := webrtc.NewController(url, tgt, host, cb)
+	errCb := func(err error) {
+		fyne.Do(func() {
+			AddLog(a, "WebRTC Err: "+err.Error())
+			dialog.ShowInformation("Connection Error", "WebRTC:\n"+err.Error(), w)
+			rtc = nil
+		})
+	}
+	c, err := webrtc.NewController(url, tgt, host, cb, errCb)
 	if err != nil {
-		fyne.Do(func() { AddLog(a, "WebRTC Error: "+err.Error()) })
+		errCb(err)
 		return
 	}
 	rtc = c
