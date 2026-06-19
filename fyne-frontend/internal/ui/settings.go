@@ -1,35 +1,54 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
 func createSettingsView(a fyne.App) fyne.CanvasObject {
-	p := a.Preferences()
-	ip, port := createSettingsEntries(p)
-	btn := widget.NewButton("Save", func() { saveSettings(p, ip.Text, port.Text) })
-	btn.Importance = widget.HighImportance
+	ip, port, share, local := createSettingsEntries(a)
 
+	saveBtn := widget.NewButton("Save", func() {
+		a.Preferences().SetString("server_ip", ip.Text)
+		a.Preferences().SetString("server_port", port.Text)
+		a.Preferences().SetString("share_name", share.Text)
+		a.Preferences().SetString("mount_path", local.Text)
+	})
+
+	return buildSettingsForm(ip, port, share, local, saveBtn)
+}
+
+func createSettingsEntries(a fyne.App) (*widget.Entry, *widget.Entry, *widget.Entry, *widget.Entry) {
+	ip := widget.NewEntry()
+	ip.SetText(a.Preferences().StringWithFallback("server_ip", ""))
+	port := widget.NewEntry()
+	port.SetText(a.Preferences().StringWithFallback("server_port", "8080"))
+
+	share := widget.NewEntry()
+	share.SetText(a.Preferences().StringWithFallback("share_name", "shared"))
+
+	local := widget.NewEntry()
+	local.SetText(a.Preferences().StringWithFallback("mount_path", getDefaultMountPath()))
+
+	return ip, port, share, local
+}
+
+func buildSettingsForm(ip, port, share, local *widget.Entry, saveBtn *widget.Button) fyne.CanvasObject {
 	return container.NewPadded(container.NewVBox(
-		widget.NewLabelWithStyle("Settings", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle("Server Config", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel("Tailscale IP:"), ip,
-		widget.NewLabel("Port:"), port, btn,
+		widget.NewLabel("Port:"), port,
+		widget.NewLabel("Share Name:"), share,
+		widget.NewLabel("Local Mount Path:"), local,
+		saveBtn,
 	))
 }
 
-func createSettingsEntries(p fyne.Preferences) (*widget.Entry, *widget.Entry) {
-	ip := widget.NewEntry()
-	ip.SetPlaceHolder("100.x.x.x")
-	ip.SetText(p.StringWithFallback("server_ip", ""))
-	port := widget.NewEntry()
-	port.SetPlaceHolder("8080")
-	port.SetText(p.StringWithFallback("server_port", "8080"))
-	return ip, port
-}
-
-func saveSettings(p fyne.Preferences, ip, port string) {
-	p.SetString("server_ip", ip)
-	p.SetString("server_port", port)
+func getDefaultMountPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Documents", "HomeNAS")
 }
