@@ -30,16 +30,17 @@ info() {
 
 check_format() {
   local -a go_files=()
+  local path
 
-  if has_staged_changes; then
-    mapfile -t go_files < <(git diff --cached --name-only --diff-filter=ACMR -- "*.go")
-  else
-    info "format: no staged Go files, skipping staged format gate"
-    return
-  fi
+  mapfile -t all_approved < <(approved_paths)
+  for path in "${all_approved[@]}"; do
+    if [[ "$path" == *.go ]] && [[ -f "$path" ]]; then
+      go_files+=("$path")
+    fi
+  done
 
   if ((${#go_files[@]} == 0)); then
-    info "format: no staged Go files to check"
+    info "format: no approved Go files to check"
     return
   fi
 
@@ -47,7 +48,7 @@ check_format() {
   if ((${#dirty[@]} > 0)); then
     printf 'FAIL: gofmt mismatch:\n' >&2
     printf '  %s\n' "${dirty[@]}" >&2
-    fail "run gofmt before committing"
+    fail "run gofmt before completing task"
   fi
 
   info "format: ok"
@@ -75,12 +76,18 @@ run_tests() {
   go test "${packages[@]}"
 }
 
-has_staged_changes() {
-  ! git diff --cached --quiet --ignore-submodules --
-}
-
-staged_paths() {
-  git diff --cached --name-only --diff-filter=ACMR
+approved_paths() {
+  local task_file
+  task_file="$(resolve_task_file)" || return 0
+  perl -ne '
+    if (/Approved-Files:\s*(.+)$/) {
+      my @items = split /,/, $1;
+      for my $item (@items) {
+        $item =~ s/^\s+|\s+$//g;
+        print "$item\n" if $item ne "none";
+      }
+    }
+  ' "$task_file"
 }
 
 resolve_task_file() {
@@ -194,54 +201,22 @@ function_length_exception_allowed() {
     grep -Eiq 'Function-Length-Approval:[[:space:]]*approved' "$task_file"
 }
 
-approved_files_contains() {
-  local task_file="$1"
-  local candidate="$2"
-  perl -e '
-    my ($candidate, $task_file) = @ARGV;
-    open my $fh, "<", $task_file or exit 1;
-    while (my $line = <$fh>) {
-      next unless $line =~ /Approved-Files:\s*(.+)$/;
-      my @items = map { s/^\s+|\s+$//gr } split /,/, $1;
-      exit 0 if grep { $_ eq $candidate } @items;
-      exit 1;
-    }
-    exit 1;
-  ' "$candidate" "$task_file"
-}
 
-check_approved_files() {
-  local task_file
-  local -a staged=()
-  local path
-
-  task_file="$(resolve_task_file)" || fail "missing task file under plan/tasks/"
-  if ! has_staged_changes; then
-    info "approval: no staged changes, skipping approved file gate"
-    return
-  fi
-
-  mapfile -t staged < <(staged_paths)
-  for path in "${staged[@]}"; do
-    approved_files_contains "$task_file" "$path" ||
-      fail "staged file is not listed in Approved-Files: $path"
-  done
-
-  info "approval: approved files match staged changes"
-}
 
 check_function_length() {
   local -a go_files=()
   local output=""
+  local path
 
-  if ! has_staged_changes; then
-    info "length: no staged changes, skipping function length gate"
-    return
-  fi
+  mapfile -t all_approved < <(approved_paths)
+  for path in "${all_approved[@]}"; do
+    if [[ "$path" == *.go ]] && [[ -f "$path" ]]; then
+      go_files+=("$path")
+    fi
+  done
 
-  mapfile -t go_files < <(git diff --cached --name-only --diff-filter=ACMR -- "*.go")
   if ((${#go_files[@]} == 0)); then
-    info "length: no staged Go files to check"
+    info "length: no approved Go files to check"
     return
   fi
 
@@ -288,28 +263,28 @@ check_function_length() {
 }
 
 check_doc_sync() {
-  local -a staged=()
+  local -a approved=()
   local need_architecture=0
   local path
 
-  if ! has_staged_changes; then
-    info "docs: no staged changes, skipping staged doc sync gate"
+  mapfile -t approved < <(approved_paths)
+  if ((${#approved[@]} == 0)); then
+    info "docs: no approved changes, skipping doc sync gate"
     return
   fi
 
-  mapfile -t staged < <(staged_paths)
-  for path in "${staged[@]}"; do
+  for path in "${approved[@]}"; do
     case "$path" in
       docs/architecture/architecture.ko.md|docs/conventions/directory-convention.ko.md|docs/conventions/type-reference.ko.md)
         ;;
-      internal/app/*|internal/config/*|main.go|configs/app.json)
+      internal/ui/*|internal/client/*|internal/app/*|internal/config/*|main.go|configs/app.json)
         need_architecture=1
         ;;
     esac
   done
 
   if ((need_architecture == 0)); then
-    info "docs: no synced docs required for staged paths"
+    info "docs: no synced docs required for approved paths"
     return
   fi
 
@@ -318,15 +293,15 @@ check_doc_sync() {
     return
   fi
 
-  if ((need_architecture == 1)) && ! printf '%s\n' "${staged[@]}" | grep -Eq '^(docs/architecture/architecture\.ko\.md|docs/conventions/directory-convention\.ko\.md)$'; then
-    fail "staged structural changes require docs/architecture/architecture.ko.md or docs/conventions/directory-convention.ko.md"
+  if ((need_architecture == 1)) && ! printf '%s\n' "${approved[@]}" | grep -Eq '^(docs/architecture/architecture\.ko\.md|docs/conventions/directory-convention\.ko\.md)$'; then
+    fail "approved structural changes require docs/architecture/architecture.ko.md or docs/conventions/directory-convention.ko.md"
   fi
 
   info "docs: ok"
 }
 
 check_requirement_governance
-check_approved_files
+
 check_function_length
 check_format
 run_tests

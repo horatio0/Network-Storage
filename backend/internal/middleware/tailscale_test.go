@@ -10,12 +10,12 @@ import (
 	"central-control-backend/internal/config"
 )
 
-func TestTailscaleAuthDisabled(t *testing.T) {
+func TestTailscaleAuthEnforced(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logger := log.Default()
 	cfg := config.AppConfig{
 		Tailscale: config.TailscaleConfig{
-			Enabled: false,
+			Enabled: false, // 설정과 무관하게 강제되어야 함
 		},
 	}
 
@@ -29,7 +29,7 @@ func TestTailscaleAuthDisabled(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/test", nil)
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("expected %d, got %d", http.StatusOK, w.Code)
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected %d, got %d", http.StatusUnauthorized, w.Code)
 	}
 }

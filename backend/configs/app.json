@@ -2,7 +2,7 @@
   "listenAddr": ":8080",
   "mountPath": "tmp_mount",
   "tailscale": {
-    "enabled": false,
+    "enabled": true,
     "allowedUsers": []
   }
 }

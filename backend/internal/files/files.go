@@ -1,7 +1,7 @@
 package files
 
 import (
-	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,28 +11,49 @@ import (
 
 func UploadHandler(mountPath string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		file, err := c.FormFile("file")
+		reader, err := c.Request.MultipartReader()
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no file provided"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read multipart"})
 			return
 		}
 
-		filename := filepath.Base(file.Filename)
-		if filename == "." || filename == "/" || filename == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
-			return
-		}
+		for {
+			part, err := reader.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read part"})
+				return
+			}
+			if part.FormName() == "file" {
+				filename := filepath.Base(part.FileName())
+				if filename == "." || filename == "/" || filename == "" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid filename"})
+					return
+				}
 
-		dst := filepath.Join(mountPath, filename)
-		if err := c.SaveUploadedFile(file, dst); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("upload failed: %v", err)})
-			return
-		}
+				dst := filepath.Join(mountPath, filename)
+				out, err := os.Create(dst)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create file"})
+					return
+				}
+				defer out.Close()
 
-		c.JSON(http.StatusOK, gin.H{
-			"message":  "file uploaded successfully",
-			"filename": filename,
-		})
+				if _, err := io.Copy(out, part); err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "upload failed"})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{
+					"message":  "file uploaded successfully",
+					"filename": filename,
+				})
+				return
+			}
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no file provided"})
 	}
 }
 

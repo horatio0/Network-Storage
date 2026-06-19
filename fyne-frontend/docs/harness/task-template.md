@@ -6,7 +6,7 @@
 
 예:
 
-- `plan/tasks/2026-04-16-dashboard-route-fix.md`
+- `plan/tasks/2026-04-16-smb-mount-ui.md`
 - `plan/tasks/2026-04-16-harness-bootstrap.md`
 
 ```md
@@ -80,7 +80,7 @@
 ## 문서 영향
 
 - Docs-Impact: update | none
-- Docs-Targets: docs/architecture/architecture.ko.md, docs/api/dashboard-api.ko.md
+- Docs-Targets: docs/architecture/architecture.ko.md, docs/ui/components.ko.md
 - Docs-Reason: 문서 수정 또는 면제 근거
 ```
 

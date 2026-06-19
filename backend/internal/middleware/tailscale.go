@@ -11,10 +11,6 @@ import (
 
 func TailscaleAuth(logger *log.Logger, cfg config.AppConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if !cfg.Tailscale.Enabled {
-			c.Next()
-			return
-		}
 
 		clientIP := c.ClientIP()
 		whois, err := tailscale.WhoIs(c.Request.Context(), clientIP)

@@ -27,12 +27,12 @@
 
 ```text
 /HARNESS-STRICT
-리버스프록시 테스트용 compose 환경을 추가해줘
+Fyne 로그인 화면 UI를 추가해줘
 ```
 
 ```text
 ./HARNESS-STRICT
-대시보드 저장 흐름을 수정해줘
+SMB 마운트 버튼 클릭 이벤트를 수정해줘
 ```
 
 ## 시작 순서
