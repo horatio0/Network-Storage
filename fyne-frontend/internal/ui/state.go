@@ -15,9 +15,9 @@ var HasNewLogs bool
 var OnLogAdded func()
 
 func AddLog(a fyne.App, msg string) {
-	logs := append([]LogEntry{{Time: time.Now().Format("15:04:05"), Message: msg}}, LoadLogs(a)...)
+	logs := append(LoadLogs(a), LogEntry{Time: time.Now().Format("15:04:05"), Message: msg})
 	if len(logs) > 50 {
-		logs = logs[:50]
+		logs = logs[len(logs)-50:]
 	}
 	b, _ := json.Marshal(logs)
 	a.Preferences().SetString("system_logs", string(b))

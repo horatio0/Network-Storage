@@ -69,7 +69,22 @@ func executeMount(a fyne.App, btn *widget.Button) {
 	ip := a.Preferences().StringWithFallback("server_ip", "")
 	share := a.Preferences().StringWithFallback("share_name", "/NS/share")
 	local := a.Preferences().StringWithFallback("mount_path", "")
-	if err := client.MountDrive(ip, share, local); err != nil {
+	
+	err := client.MountDrive(ip, share, local)
+	if err == client.ErrPasswordRequired {
+		pwdEntry := widget.NewPasswordEntry()
+		pwdEntry.PlaceHolder = "Enter Sudo Password"
+		win := a.Driver().AllWindows()[0]
+		dialog.ShowCustomConfirm("Sudo Password Required", "OK", "Cancel", pwdEntry, func(ok bool) {
+			if ok {
+				client.SetSudoPassword(pwdEntry.Text)
+				executeMount(a, btn)
+			}
+		}, win)
+		return
+	}
+
+	if err != nil {
 		AddLog(a, "Mount Error: "+err.Error())
 	} else {
 		AddLog(a, "Mounted to "+local)
@@ -80,7 +95,22 @@ func executeMount(a fyne.App, btn *widget.Button) {
 
 func executeUnmount(a fyne.App, btn *widget.Button) {
 	local := a.Preferences().StringWithFallback("mount_path", "")
-	if err := client.UnmountDrive(local); err != nil {
+	
+	err := client.UnmountDrive(local)
+	if err == client.ErrPasswordRequired {
+		pwdEntry := widget.NewPasswordEntry()
+		pwdEntry.PlaceHolder = "Enter Sudo Password"
+		win := a.Driver().AllWindows()[0]
+		dialog.ShowCustomConfirm("Sudo Password Required", "OK", "Cancel", pwdEntry, func(ok bool) {
+			if ok {
+				client.SetSudoPassword(pwdEntry.Text)
+				executeUnmount(a, btn)
+			}
+		}, win)
+		return
+	}
+
+	if err != nil {
 		AddLog(a, "Unmount Error: "+err.Error())
 	} else {
 		AddLog(a, "Unmounted "+local)
