@@ -75,32 +75,3 @@ Network-Storage/
 구축 및 실행에 대한 가장 상세한 매뉴얼은 아래 문서를 반드시 먼저 참고하시기 바랍니다.
 
 👉 **[환경 세팅 가이드 (setting.md) 바로가기](setting.md)**
-
-### 요약: 백엔드 빌드 및 실행
-```bash
-cd backend
-chmod +x scripts/build.sh
-./scripts/build.sh
-./bin/backend-server
-```
-
-### 요약: 클라이언트(프론트엔드) 실행
-```bash
-cd fyne-frontend
-go mod tidy
-go run main.go
-# 앱 우측 상단의 톱니바퀴 ⚙️ 클릭 -> 서버의 Tailscale IP 입력 후 사용
-```
-
----
-
-## 🛡️ 네트워크 통신 아키텍처 (Architecture)
-
-```mermaid
-graph LR
-    subgraph Tailscale VPN 
-        Client["Desktop App<br>(Fyne GUI)"] <-->|"HTTP/WS<br>Encrypted"| Backend["Backend Server<br>(Gin API)"]
-        Client <-->|"WebRTC P2P<br>Direct Stream"| Client2["Other Clients"]
-        Client <-->|"SMB/NFS<br>Direct Mount"| BackendFS["Shared Directory"]
-    end
-```
