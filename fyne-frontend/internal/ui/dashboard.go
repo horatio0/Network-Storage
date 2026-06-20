@@ -3,6 +3,8 @@ package ui
 import (
 	"fmt"
 	"image/color"
+	"sort"
+	"strings"
 	"time"
 
 	"network-storage-client/internal/client"
@@ -11,8 +13,12 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+var updateMainLogs func()
 
 var (
 	lastMonErr  string
@@ -34,11 +40,26 @@ func createMainView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.Canvas
 	updateMountBtn(a, mBtn)
 
 	devBox := container.NewVBox()
+
+	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		ip := a.Preferences().StringWithFallback("server_ip", "")
+		port := a.Preferences().StringWithFallback("server_port", "8080")
+		if ip != "" {
+			go fetchAndUpdateDevs(a, c, ip, port, devBox, w)
+		}
+	})
+
+	ip := a.Preferences().StringWithFallback("server_ip", "")
+	port := a.Preferences().StringWithFallback("server_port", "8080")
+	if ip != "" {
+		go fetchAndUpdateDevs(a, c, ip, port, devBox, w)
+	}
+
 	go startDashboardLoop(a, c, cpuLbl, memLbl, tempLbl, devBox, w)
-	return buildMainUI(cpuLbl, memLbl, tempLbl, mBtn, devBox)
+	return buildMainUI(a, cpuLbl, memLbl, tempLbl, mBtn, devBox, refreshBtn)
 }
 
-func buildMainUI(cpu, mem, temp *widget.Label, mBtn *widget.Button, devBox *fyne.Container) fyne.CanvasObject {
+func buildMainUI(a fyne.App, cpu, mem, temp *widget.Label, mBtn *widget.Button, devBox *fyne.Container, refreshBtn *widget.Button) fyne.CanvasObject {
 	title := widget.NewLabelWithStyle("Main Dashboard", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	cpuBox := container.NewBorder(cpu, nil, nil, nil, cpuChart)
 	memBox := container.NewBorder(mem, nil, nil, nil, memChart)
@@ -48,19 +69,81 @@ func buildMainUI(cpu, mem, temp *widget.Label, mBtn *widget.Button, devBox *fyne
 
 	bg := canvas.NewRectangle(color.NRGBA{R: 20, G: 20, B: 20, A: 255})
 	devScroll := container.NewPadded(container.NewScroll(devBox))
-	devCard := widget.NewCard("Connected Devices", "", container.NewStack(bg, devScroll))
+	
+	devTitle := container.NewHBox(
+		widget.NewLabelWithStyle("Connected Devices", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		layout.NewSpacer(),
+		refreshBtn,
+	)
+	devContent := container.NewBorder(devTitle, nil, nil, nil, container.NewStack(bg, devScroll))
+	
+	devCard := widget.NewCard("", "", devContent)
+	
+	logsContainer := container.NewStack(createLogsView(a, nil))
+	logsCard := widget.NewCard("", "", logsContainer)
+	updateMainLogs = func() {
+		logsContainer.Objects = []fyne.CanvasObject{createLogsView(a, nil)}
+		logsContainer.Refresh()
+	}
+
+	bottomGrid := container.NewGridWithColumns(2, devCard, logsCard)
 
 	top := container.NewVBox(title, mBtn)
-	return container.NewPadded(container.NewBorder(top, card, nil, nil, devCard))
+	return container.NewPadded(container.NewBorder(top, card, nil, nil, bottomGrid))
+}
+
+func showSudoDialog(a fyne.App, btn *widget.Button, errMsg string, isMount bool) {
+	pwdEntry := widget.NewPasswordEntry()
+	pwdEntry.PlaceHolder = "Enter Sudo Password"
+
+	var vbox *fyne.Container
+	if errMsg != "" {
+		errLbl := widget.NewLabelWithStyle(errMsg, fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+		errLbl.Importance = widget.DangerImportance
+		vbox = container.NewVBox(errLbl, pwdEntry)
+	} else {
+		vbox = container.NewVBox(pwdEntry)
+	}
+
+	content := container.NewPadded(vbox)
+
+	win := a.Driver().AllWindows()[0]
+	var d dialog.Dialog
+	
+	submitFunc := func() {
+		client.SetSudoPassword(pwdEntry.Text)
+		if isMount {
+			executeMount(a, btn)
+		} else {
+			executeUnmount(a, btn)
+		}
+		if d != nil {
+			d.Hide()
+		}
+	}
+	
+	pwdEntry.OnSubmitted = func(s string) {
+		submitFunc()
+	}
+
+	d = dialog.NewCustomConfirm("Sudo Password Required", "OK", "Cancel", content, func(ok bool) {
+		if ok {
+			submitFunc()
+		}
+	}, win)
+	
+	d.Resize(fyne.NewSize(400, 150))
+	d.Show()
+	win.Canvas().Focus(pwdEntry)
 }
 
 func updateMountBtn(a fyne.App, btn *widget.Button) {
 	isMounted := a.Preferences().BoolWithFallback("is_mounted", false)
 	if isMounted {
-		btn.SetText("Unmount Server")
+		btn.SetText("Unmount Filesystem")
 		btn.OnTapped = func() { executeUnmount(a, btn) }
 	} else {
-		btn.SetText("Mount Server")
+		btn.SetText("Mount Filesystem")
 		btn.OnTapped = func() { executeMount(a, btn) }
 	}
 }
@@ -70,53 +153,59 @@ func executeMount(a fyne.App, btn *widget.Button) {
 	share := a.Preferences().StringWithFallback("share_name", "/NS/share")
 	local := a.Preferences().StringWithFallback("mount_path", "")
 	
-	err := client.MountDrive(ip, share, local)
-	if err == client.ErrPasswordRequired {
-		pwdEntry := widget.NewPasswordEntry()
-		pwdEntry.PlaceHolder = "Enter Sudo Password"
-		win := a.Driver().AllWindows()[0]
-		dialog.ShowCustomConfirm("Sudo Password Required", "OK", "Cancel", pwdEntry, func(ok bool) {
-			if ok {
-				client.SetSudoPassword(pwdEntry.Text)
-				executeMount(a, btn)
-			}
-		}, win)
-		return
-	}
+	go func() {
+		err := client.MountDrive(ip, share, local)
+		if err == client.ErrPasswordRequired {
+			fyne.Do(func() {
+				showSudoDialog(a, btn, "", true)
+			})
+			return
+		}
 
-	if err != nil {
-		AddLog(a, "Mount Error: "+err.Error())
-	} else {
-		AddLog(a, "Mounted to "+local)
-		a.Preferences().SetBool("is_mounted", true)
-		updateMountBtn(a, btn)
-	}
+		fyne.Do(func() {
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), "incorrect password") {
+					client.SetSudoPassword("")
+					showSudoDialog(a, btn, "Incorrect password. Please try again.", true)
+				} else {
+					AddLog(a, "Mount Error: "+err.Error())
+				}
+			} else {
+				AddLog(a, "Mounted to "+local)
+				a.Preferences().SetBool("is_mounted", true)
+				updateMountBtn(a, btn)
+			}
+		})
+	}()
 }
 
 func executeUnmount(a fyne.App, btn *widget.Button) {
 	local := a.Preferences().StringWithFallback("mount_path", "")
 	
-	err := client.UnmountDrive(local)
-	if err == client.ErrPasswordRequired {
-		pwdEntry := widget.NewPasswordEntry()
-		pwdEntry.PlaceHolder = "Enter Sudo Password"
-		win := a.Driver().AllWindows()[0]
-		dialog.ShowCustomConfirm("Sudo Password Required", "OK", "Cancel", pwdEntry, func(ok bool) {
-			if ok {
-				client.SetSudoPassword(pwdEntry.Text)
-				executeUnmount(a, btn)
-			}
-		}, win)
-		return
-	}
+	go func() {
+		err := client.UnmountDrive(local)
+		if err == client.ErrPasswordRequired {
+			fyne.Do(func() {
+				showSudoDialog(a, btn, "", false)
+			})
+			return
+		}
 
-	if err != nil {
-		AddLog(a, "Unmount Error: "+err.Error())
-	} else {
-		AddLog(a, "Unmounted "+local)
-		a.Preferences().SetBool("is_mounted", false)
-		updateMountBtn(a, btn)
-	}
+		fyne.Do(func() {
+			if err != nil {
+				if strings.Contains(strings.ToLower(err.Error()), "incorrect password") {
+					client.SetSudoPassword("")
+					showSudoDialog(a, btn, "Incorrect password. Please try again.", false)
+				} else {
+					AddLog(a, "Unmount Error: "+err.Error())
+				}
+			} else {
+				AddLog(a, "Unmounted from "+local)
+				a.Preferences().SetBool("is_mounted", false)
+				updateMountBtn(a, btn)
+			}
+		})
+	}()
 }
 
 func startDashboardLoop(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
@@ -136,7 +225,6 @@ func updateDashboardData(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widge
 	}
 
 	fetchAndUpdateStats(a, c, ip, port, cpu, mem, temp)
-	fetchAndUpdateDevs(a, c, ip, port, devBox, w)
 }
 
 func fetchAndUpdateStats(a fyne.App, c *client.HTTPClient, ip, port string, cpu, mem, temp *widget.Label) {
@@ -152,6 +240,12 @@ func fetchAndUpdateStats(a fyne.App, c *client.HTTPClient, ip, port string, cpu,
 func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBox *fyne.Container, w fyne.Window) {
 	devs, _ := client.FetchDevices(c, ip, port)
 	if devs != nil {
+		sort.Slice(devs, func(i, j int) bool {
+			ipI, ipJ := "", ""
+			if len(devs[i].IPs) > 0 { ipI = devs[i].IPs[0] }
+			if len(devs[j].IPs) > 0 { ipJ = devs[j].IPs[0] }
+			return ipI < ipJ
+		})
 		updateDevices(a, devBox, devs, w)
 	}
 }
@@ -201,7 +295,15 @@ func buildDeviceRow(a fyne.App, i int, d client.Device, w fyne.Window) fyne.Canv
 		ipStr = d.IPs[0]
 	}
 	key := "alias_" + ipStr
-	alias := a.Preferences().StringWithFallback(key, fmt.Sprintf("device%d", i+1))
+	
+	defaultAlias := d.Name
+	if parts := strings.Split(defaultAlias, "."); len(parts) > 0 {
+		defaultAlias = parts[0]
+	}
+	if defaultAlias == "" {
+		defaultAlias = fmt.Sprintf("device%d", i+1)
+	}
+	alias := a.Preferences().StringWithFallback(key, defaultAlias)
 
 	lbl := canvas.NewText(fmt.Sprintf("%s [%s] %s", d.OS, ipStr, alias), color.White)
 	btn := widget.NewButton("✏️", nil)

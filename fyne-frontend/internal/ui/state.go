@@ -21,7 +21,7 @@ func AddLog(a fyne.App, msg string) {
 	}
 	b, _ := json.Marshal(logs)
 	a.Preferences().SetString("system_logs", string(b))
-	if currentTab != 1 {
+	if currentTab != 1 && currentTab != 0 {
 		HasNewLogs = true
 	}
 	if OnLogAdded != nil {

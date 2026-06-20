@@ -24,6 +24,14 @@
 
 ---
 
+## 📸 스크린샷 (Screenshots)
+
+| 메인 대시보드 (Dashboard & Logs) | 파일 관리자 (Files) | 원격 터미널 (WebTerminal) |
+|:---:|:---:|:---:|
+| ![Main](images/Main.png) | ![Files](images/Files.png) | ![Terminal](images/Terminal.png) |
+
+---
+
 ## 🛠️ 기술 스택 (Tech Stack)
 
 ### Backend (`backend/`)

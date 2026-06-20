@@ -136,7 +136,22 @@ sudo systemctl status network-storage-backend
 journalctl -u network-storage-backend -f
 ```
 
----
+### 1.7 방화벽(Firewall) 개방 설정
+서버에 UFW(Uncomplicated Firewall) 등의 방화벽이 활성화되어 있다면, 클라이언트가 접속할 수 있도록 포트를 개방해야 합니다. 보안을 위해 **외부 인터넷 망이 아닌 Tailscale 가상 네트워크 인터페이스(`tailscale0`)를 통해서만 접속을 허용**하는 것이 가장 안전합니다.
+
+```bash
+# UFW 방화벽 상태 확인
+sudo ufw status
+
+# Tailscale 네트워크(tailscale0)를 통한 모든 인바운드 트래픽 허용 (가장 간편하고 안전한 방법)
+sudo ufw allow in on tailscale0
+
+# 만약 인터페이스 단위가 아닌 특정 포트 단위로만 개방하고 싶다면 아래를 참고하세요.
+# sudo ufw allow in on tailscale0 to any port 8080 proto tcp  # 백엔드 API
+# sudo ufw allow in on tailscale0 to any port 445 proto tcp   # SMB (Windows/Mac 파일 공유)
+# sudo ufw allow in on tailscale0 to any port 2049 proto tcp  # NFS (Linux 마운트)
+```
+**ufw가 아닌 firewall도 동일하게 개방**
 
 ## 2. 클라이언트(Client) 환경 세팅 가이드
 

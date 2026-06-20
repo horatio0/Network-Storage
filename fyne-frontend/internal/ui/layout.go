@@ -39,6 +39,10 @@ func setupLogCallback(a fyne.App, contentArea *fyne.Container, c *client.HTTPCli
 				contentArea.Objects = nil
 				loadViewForTab(1, a, contentArea, c, w)
 				contentArea.Refresh()
+			} else if currentTab == 0 {
+				if updateMainLogs != nil {
+					updateMainLogs()
+				}
 			}
 		})
 	}
@@ -96,7 +100,7 @@ func handleSidebarSelect(idx int, a fyne.App, cArea *fyne.Container, c *client.H
 		return
 	}
 	currentTab = idx
-	if idx == 1 {
+	if idx == 1 || idx == 0 {
 		HasNewLogs = false
 	}
 	updateSidebarState(idx)

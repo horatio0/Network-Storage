@@ -2,9 +2,12 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"io"
+	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/fyne-io/terminal"
@@ -41,6 +44,11 @@ func (w *wsWrapper) Close() error {
 	return w.conn.Close()
 }
 
+var (
+	cachedTerminal fyne.CanvasObject
+	cachedTerminalURL string
+)
+
 func createTerminalView(a fyne.App, w fyne.Window) fyne.CanvasObject {
 	ip := a.Preferences().StringWithFallback("server_ip", "")
 	port := a.Preferences().StringWithFallback("server_port", "8080")
@@ -49,7 +57,14 @@ func createTerminalView(a fyne.App, w fyne.Window) fyne.CanvasObject {
 	}
 
 	url := fmt.Sprintf("ws://%s:%s/api/v1/terminal/ws", ip, port)
-	return connectTerminal(url)
+	
+	if cachedTerminal != nil && cachedTerminalURL == url {
+		return cachedTerminal
+	}
+
+	cachedTerminalURL = url
+	cachedTerminal = connectTerminal(url)
+	return cachedTerminal
 }
 
 func connectTerminal(url string) fyne.CanvasObject {
@@ -63,5 +78,10 @@ func connectTerminal(url string) fyne.CanvasObject {
 	go func() {
 		_ = term.RunWithConnection(ws, ws)
 	}()
-	return container.NewMax(term)
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		ws.Write([]byte("\r\n"))
+	}()
+	bg := canvas.NewRectangle(color.NRGBA{R: 0, G: 0, B: 0, A: 255})
+	return container.NewMax(bg, term)
 }

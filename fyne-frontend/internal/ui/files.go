@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -21,7 +22,7 @@ func createFilesView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.Canva
 	pathLbl := widget.NewLabel("Path: " + currentPath)
 
 	upBtn := widget.NewButton("Upload", func() { triggerUpload(a, c, w) })
-	newBtn := widget.NewButton("New Folder", func() { promptMkdir(a, c, w, vbox, pathLbl) })
+	newBtn := widget.NewButton("New Directory", func() { promptMkdir(a, c, w, vbox, pathLbl) })
 
 	go refreshFileList(a, c, vbox, pathLbl, w)
 
@@ -45,6 +46,16 @@ func refreshFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pat
 }
 
 func buildFileBrowser(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, files []client.FileInfo, w fyne.Window) {
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].IsDir && !files[j].IsDir {
+			return true
+		}
+		if !files[i].IsDir && files[j].IsDir {
+			return false
+		}
+		return strings.ToLower(files[i].Name) < strings.ToLower(files[j].Name)
+	})
+
 	var items []client.FileInfo
 	if currentPath != "/" {
 		items = append(items, client.FileInfo{Name: "..", IsDir: true})
@@ -66,23 +77,32 @@ func configureFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, p
 }
 
 func createFileRow(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, i client.FileInfo, w fyne.Window) fyne.CanvasObject {
-	prefix := "📄 "
+	t := canvas.NewText(i.Name, color.White)
+	
+	var display fyne.CanvasObject = t
 	if i.IsDir {
-		prefix = "📁 "
+		img := canvas.NewImageFromFile("resources/directory.png")
+		img.FillMode = canvas.ImageFillContain
+		img.SetMinSize(fyne.NewSize(20, 20))
+		display = container.NewHBox(img, t)
 	}
-	t := canvas.NewText(prefix+i.Name, color.White)
+	
 	tap := newTappable(func() { handleFileClick(a, c, vbox, pathLbl, i, w) })
+	
 	if i.Name == ".." {
-		return container.NewPadded(container.NewStack(t, tap))
+		return container.NewStack(display, tap)
 	}
-	delBtn := widget.NewButton("🗑", func() { promptDelete(a, c, w, vbox, pathLbl, i.Name) })
-	row := container.NewBorder(nil, nil, nil, delBtn, container.NewStack(t, tap))
-	return container.NewPadded(row)
+	delBtn := widget.NewButton("Delete", func() { promptDelete(a, c, w, vbox, pathLbl, i.Name) })
+	if !i.IsDir {
+		dlBtn := widget.NewButton("Download", func() { triggerDownload(a, c, i.Name) })
+		actions := container.NewHBox(dlBtn, delBtn)
+		return container.NewBorder(nil, nil, nil, actions, container.NewStack(display, tap))
+	}
+	return container.NewBorder(nil, nil, nil, delBtn, container.NewStack(display, tap))
 }
 
 func handleFileClick(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, f client.FileInfo, w fyne.Window) {
 	if !f.IsDir {
-		triggerDownload(a, c, f.Name)
 		return
 	}
 	updateCurrentPath(f.Name)
@@ -111,12 +131,14 @@ func moveUpDirectory() {
 
 func triggerUpload(a fyne.App, c *client.HTTPClient, w fyne.Window) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
-	dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
+	d := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil || reader == nil {
 			return
 		}
 		go uploadWorker(a, c, ip, port, reader.URI().Path(), currentPath)
 	}, w)
+	d.Resize(fyne.NewSize(800, 600))
+	d.Show()
 }
 
 func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir string) {
@@ -156,8 +178,10 @@ func downloadWorker(a fyne.App, c *client.HTTPClient, ip, port, file, save strin
 
 func promptMkdir(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Container, pathLbl *widget.Label) {
 	entry := widget.NewEntry()
-	dialog.ShowCustomConfirm("New Folder", "Create", "Cancel", entry, func(b bool) {
-		if b && entry.Text != "" {
+	var d dialog.Dialog
+	
+	submitFunc := func() {
+		if entry.Text != "" {
 			target := currentPath
 			if target == "/" {
 				target = "/" + entry.Text
@@ -166,7 +190,23 @@ func promptMkdir(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Con
 			}
 			go executeMkdir(a, c, target, vbox, pathLbl, w)
 		}
+		if d != nil {
+			d.Hide()
+		}
+	}
+
+	entry.OnSubmitted = func(s string) {
+		submitFunc()
+	}
+
+	d = dialog.NewCustomConfirm("New Directory", "Create", "Cancel", entry, func(b bool) {
+		if b {
+			submitFunc()
+		}
 	}, w)
+	d.Resize(fyne.NewSize(400, 150))
+	d.Show()
+	w.Canvas().Focus(entry)
 }
 
 func executeMkdir(a fyne.App, c *client.HTTPClient, target string, vbox *fyne.Container, pathLbl *widget.Label, w fyne.Window) {

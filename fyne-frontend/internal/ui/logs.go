@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,7 +21,18 @@ func createLogsView(a fyne.App, unused interface{}) fyne.CanvasObject {
 
 	title := widget.NewLabelWithStyle("System Logs", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	clearBtn := widget.NewButton("Clear", func() { ClearLogs(a) })
-	topBar := container.NewBorder(nil, nil, nil, clearBtn, title)
+	copyBtn := widget.NewButton("Copy", func() {
+		logs := LoadLogs(a)
+		var sb strings.Builder
+		for _, l := range logs {
+			sb.WriteString(l.Time + " - " + l.Message + "\n")
+		}
+		if len(a.Driver().AllWindows()) > 0 {
+			a.Driver().AllWindows()[0].Clipboard().SetContent(sb.String())
+		}
+	})
+	buttons := container.NewHBox(copyBtn, clearBtn)
+	topBar := container.NewBorder(nil, nil, nil, buttons, title)
 
 	return container.NewBorder(topBar, nil, nil, nil, stack)
 }

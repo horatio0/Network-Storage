@@ -24,6 +24,12 @@ func (c *customTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant)
 		}
 		return color.NRGBA{R: 28, G: 28, B: 30, A: 255}
 	}
+	if name == theme.ColorNameOverlayBackground {
+		if variant == theme.VariantLight {
+			return color.NRGBA{R: 235, G: 235, B: 237, A: 255}
+		}
+		return color.NRGBA{R: 28, G: 28, B: 30, A: 255}
+	}
 	if name == theme.ColorNamePrimary {
 		return color.NRGBA{R: 10, G: 132, B: 255, A: 255}
 	}
