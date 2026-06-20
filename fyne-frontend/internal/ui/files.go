@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"network-storage-client/internal/client"
 )
@@ -78,17 +79,15 @@ func configureFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, p
 
 func createFileRow(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, i client.FileInfo, w fyne.Window) fyne.CanvasObject {
 	t := canvas.NewText(i.Name, color.White)
-	
+
 	var display fyne.CanvasObject = t
 	if i.IsDir {
-		img := canvas.NewImageFromFile("resources/directory.png")
-		img.FillMode = canvas.ImageFillContain
-		img.SetMinSize(fyne.NewSize(20, 20))
-		display = container.NewHBox(img, t)
+		icon := widget.NewIcon(theme.FolderIcon())
+		display = container.NewHBox(icon, t)
 	}
-	
+
 	tap := newTappable(func() { handleFileClick(a, c, vbox, pathLbl, i, w) })
-	
+
 	if i.Name == ".." {
 		return container.NewStack(display, tap)
 	}
@@ -179,7 +178,7 @@ func downloadWorker(a fyne.App, c *client.HTTPClient, ip, port, file, save strin
 func promptMkdir(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Container, pathLbl *widget.Label) {
 	entry := widget.NewEntry()
 	var d dialog.Dialog
-	
+
 	submitFunc := func() {
 		if entry.Text != "" {
 			target := currentPath

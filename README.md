@@ -75,3 +75,15 @@ Network-Storage/
 구축 및 실행에 대한 가장 상세한 매뉴얼은 아래 문서를 반드시 먼저 참고하시기 바랍니다.
 
 👉 **[환경 세팅 가이드 (setting.md) 바로가기](setting.md)**
+
+---
+
+## 설치/삭제하기 (Install/Uninstall)
+
+### Client
+- **설치:** `Network Storage/fyne-frontend/scripts/install.sh` 실행
+- **삭제:** `Network Storage/fyne-frontend/scripts/uninstall.sh` 실행
+
+### Server
+1. `Network Storage/backend/scripts/build.sh` 스크립트를 실행하여 빌드합니다.
+2. 빌드가 완료되면 `Network Storage/backend/bin/` 디렉터리에 생성된 실행 파일을 통해 서버를 구동할 수 있습니다.
