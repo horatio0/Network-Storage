@@ -26,7 +26,7 @@
 
 ## 📸 스크린샷 (Screenshots)
 
-| 메인 대시보드 (Dashboard & Logs) | 파일 관리자 (Files) | 원격 터미널 (WebTerminal) |
+| 메인 대시보드 (Dashboard & Logs) | 파일 업/다운로드 (Files) | 원격 터미널 (WebTerminal) |
 |:---:|:---:|:---:|
 | ![Main](images/Main.png) | ![Files](images/Files.png) | ![Terminal](images/Terminal.png) |
 
