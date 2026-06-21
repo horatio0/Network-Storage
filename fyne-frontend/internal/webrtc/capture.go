@@ -39,11 +39,13 @@ func sendScreenFrames(dc *webrtc.DataChannel) {
 }
 
 func setupDataChannelViewer(c *Controller) {
-	c.pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-		dc.OnMessage(func(msg webrtc.DataChannelMessage) {
-			if c.onFrame != nil {
-				c.onFrame(msg.Data)
-			}
-		})
+	dc, err := c.pc.CreateDataChannel("video", nil)
+	if err != nil {
+		return
+	}
+	dc.OnMessage(func(msg webrtc.DataChannelMessage) {
+		if c.onFrame != nil {
+			c.onFrame(msg.Data)
+		}
 	})
 }

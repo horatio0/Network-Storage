@@ -256,7 +256,7 @@ func logMonitorErr(a fyne.App, e string) {
 			AddLog(a, "Monitor Error: "+e)
 			lastLogTime = time.Now()
 			noti := fyne.NewNotification("Error", "에러가 발생했습니다. Logs탭에서 확인해 주세요")
-			a.SendNotification(noti)
+			go a.SendNotification(noti)
 			lastMonErr = e
 		} else if time.Since(lastLogTime) > 10*time.Second {
 			AddLog(a, "Monitor Error: "+e)

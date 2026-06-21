@@ -4,16 +4,16 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"central-control-backend/internal/config"
+	"github.com/gin-gonic/gin"
 	"tailscale.com/client/tailscale"
 )
 
-func TailscaleAuth(logger *log.Logger, cfg config.AppConfig) gin.HandlerFunc {
+func TailscaleAuth(logger *log.Logger, cfg config.AppConfig, tsClient *tailscale.LocalClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		remoteAddr := c.Request.RemoteAddr
-		whois, err := tailscale.WhoIs(c.Request.Context(), remoteAddr)
+		whois, err := tsClient.WhoIs(c.Request.Context(), remoteAddr)
 		if err != nil {
 			logger.Printf("Tailscale Auth failed for %s: %v", remoteAddr, err)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Not on Tailscale"})

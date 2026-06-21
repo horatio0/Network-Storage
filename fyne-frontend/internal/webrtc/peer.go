@@ -93,7 +93,7 @@ func (c *Controller) StartSignaling() {
 			handleSigMsg(c, msg)
 		}
 	}()
-	if c.isHost {
+	if !c.isHost {
 		createOffer(c)
 	}
 }

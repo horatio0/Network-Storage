@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gin-gonic/gin"
 	"central-control-backend/internal/config"
 	"central-control-backend/internal/files"
 	"central-control-backend/internal/middleware"
@@ -14,6 +13,8 @@ import (
 	"central-control-backend/internal/signaling"
 	"central-control-backend/internal/tailscale"
 	"central-control-backend/internal/terminal"
+	"github.com/gin-gonic/gin"
+	tsclient "tailscale.com/client/tailscale"
 )
 
 type App struct {
@@ -40,13 +41,14 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	
+
 	// App-level middlewares: Logger, Recovery, TailscaleAuth
+	tsClient := &tsclient.LocalClient{}
 	router.Use(middleware.Logger(logger), gin.Recovery())
-	router.Use(middleware.TailscaleAuth(logger, cfg))
+	router.Use(middleware.TailscaleAuth(logger, cfg, tsClient))
 
 	sigHub := signaling.NewHub()
-	setupRoutes(router, cfg, sigHub)
+	setupRoutes(router, cfg, sigHub, tsClient)
 
 	app := &App{
 		logger:       logger,
@@ -60,7 +62,7 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	return app, nil
 }
 
-func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub) {
+func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub, tsClient *tsclient.LocalClient) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
@@ -94,5 +96,5 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub) {
 
 	r.GET("/api/v1/terminal/ws", terminal.Handler)
 	r.GET("/api/v1/signaling/ws", signaling.Handler(sigHub))
-	r.GET("/api/v1/tailscale/devices", tailscale.GetDevicesHandler)
+	r.GET("/api/v1/tailscale/devices", tailscale.GetDevicesHandler(tsClient))
 }

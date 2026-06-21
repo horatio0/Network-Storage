@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"central-control-backend/internal/config"
+	"tailscale.com/client/tailscale"
 )
 
 func TestTailscaleAuthEnforced(t *testing.T) {
@@ -19,8 +20,10 @@ func TestTailscaleAuthEnforced(t *testing.T) {
 		},
 	}
 
+	tsClient := &tailscale.LocalClient{}
+
 	router := gin.New()
-	router.Use(TailscaleAuth(logger, cfg))
+	router.Use(TailscaleAuth(logger, cfg, tsClient))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
