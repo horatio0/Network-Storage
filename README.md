@@ -86,4 +86,4 @@ Network-Storage/
 
 ### Server
 1. 우분투 환경에서 `Network Storage/backend/scripts/install.sh` 스크립트를 실행합니다. (`sudo` 권한 필요)
-2. `go build`를 통해 컴파일된 후 `/usr/local/bin`에 설치되며, 백그라운드 구동을 위한 `systemd` 서비스(`network-storage.service`)가 자동으로 등록되고 시작됩니다.
+2. `go build`를 통해 컴파일된 후 `/NS/server`에 설치되며, 백그라운드 구동을 위한 `systemd` 서비스(`network-storage.service`)가 자동으로 등록되고 시작됩니다.

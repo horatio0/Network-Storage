@@ -89,7 +89,7 @@ cd backend
 chmod +x scripts/install.sh
 sudo ./scripts/install.sh
 ```
-설치 스크립트는 컴파일된 바이너리를 `/usr/local/bin`으로 복사하고, 즉시 백그라운드 서비스(`systemd`)로 등록하여 서버를 구동합니다.
+설치 스크립트는 컴파일된 바이너리를 `/NS/server`로 복사하고, 즉시 백그라운드 서비스(`systemd`)로 등록하여 서버를 구동합니다.
 ### 1.6 백엔드 Systemd 서비스 관리
 위의 `install.sh` 스크립트를 실행했다면 `network-storage.service`라는 이름으로 Systemd 서비스가 이미 등록 및 실행 중입니다. 서버가 재부팅되어도 자동으로 시작됩니다.
 

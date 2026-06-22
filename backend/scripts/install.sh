@@ -20,9 +20,10 @@ echo "[1/4] Building backend binary using go build..."
 # Build the binary
 go build -o network-storage-server .
 
-echo "[2/4] Moving binary to /usr/local/bin/network-storage-server..."
-mv network-storage-server /usr/local/bin/network-storage-server
-chmod +x /usr/local/bin/network-storage-server
+echo "[2/4] Moving binary to /NS/server/network-storage-server..."
+mkdir -p /NS/server
+mv network-storage-server /NS/server/network-storage-server
+chmod +x /NS/server/network-storage-server
 
 echo "[3/4] Creating systemd service file..."
 cat > /etc/systemd/system/network-storage.service << 'EOF'
@@ -34,11 +35,11 @@ After=network.target
 Type=simple
 # Change User to a non-root user if needed
 User=root
-ExecStart=/usr/local/bin/network-storage-server
+ExecStart=/NS/server/network-storage-server
 Restart=on-failure
 RestartSec=5
 # Adjust WorkingDirectory if your server requires specific paths
-WorkingDirectory=/usr/local/bin
+WorkingDirectory=/NS/server
 
 [Install]
 WantedBy=multi-user.target
