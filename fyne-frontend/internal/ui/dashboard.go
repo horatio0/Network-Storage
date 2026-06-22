@@ -1,8 +1,12 @@
 package ui
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"image/color"
+	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +23,7 @@ import (
 )
 
 var updateMainLogs func()
+var dashboardCancel context.CancelFunc
 
 var (
 	lastMonErr  string
@@ -55,7 +60,13 @@ func createMainView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.Canvas
 		go fetchAndUpdateDevs(a, c, ip, port, devBox, w)
 	}
 
-	go startDashboardLoop(a, c, cpuLbl, memLbl, tempLbl, devBox, w)
+	if dashboardCancel != nil {
+		dashboardCancel()
+	}
+	var ctx context.Context
+	ctx, dashboardCancel = context.WithCancel(context.Background())
+
+	go startDashboardLoop(ctx, a, c, cpuLbl, memLbl, tempLbl, devBox, w)
 	return buildMainUI(a, cpuLbl, memLbl, tempLbl, mBtn, devBox, refreshBtn)
 }
 
@@ -152,6 +163,15 @@ func executeMount(a fyne.App, btn *widget.Button) {
 	ip := a.Preferences().StringWithFallback("server_ip", "")
 	share := a.Preferences().StringWithFallback("share_name", "/NS/share")
 	local := a.Preferences().StringWithFallback("mount_path", "")
+
+	if runtime.GOOS == "windows" {
+		matched, _ := regexp.MatchString(`^[a-zA-Z]:$`, local)
+		if !matched {
+			win := a.Driver().AllWindows()[0]
+			dialog.ShowError(errors.New("윈도우에서는 Z:와 같은 드라이브 문자를 사용해야 합니다."), win)
+			return
+		}
+	}
 	
 	go func() {
 		err := client.MountDrive(ip, share, local)
@@ -208,33 +228,61 @@ func executeUnmount(a fyne.App, btn *widget.Button) {
 	}()
 }
 
-func startDashboardLoop(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		updateDashboardData(a, c, cpu, mem, temp, devBox, w)
-	}
-}
+func startDashboardLoop(mainCtx context.Context, a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
+	for {
+		select {
+		case <-mainCtx.Done():
+			return
+		default:
+		}
 
-func updateDashboardData(a fyne.App, c *client.HTTPClient, cpu, mem, temp *widget.Label, devBox *fyne.Container, w fyne.Window) {
-	ip := a.Preferences().StringWithFallback("server_ip", "")
-	port := a.Preferences().StringWithFallback("server_port", "8080")
-	if ip == "" {
-		logMonitorErr(a, "Please set Server IP")
-		return
-	}
+		ip := a.Preferences().StringWithFallback("server_ip", "")
+		port := a.Preferences().StringWithFallback("server_port", "8080")
+		if ip == "" {
+			logMonitorErr(a, "Please set Server IP")
+			select {
+			case <-mainCtx.Done():
+				return
+			case <-time.After(2 * time.Second):
+			}
+			continue
+		}
 
-	fetchAndUpdateStats(a, c, ip, port, cpu, mem, temp)
-}
+		streamCtx, cancelStream := context.WithCancel(mainCtx)
+		
+		// Watch for IP/Port changes to cancel stream
+		go func(currentIP, currentPort string) {
+			ticker := time.NewTicker(2 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-streamCtx.Done():
+					return
+				case <-ticker.C:
+					newIP := a.Preferences().StringWithFallback("server_ip", "")
+					newPort := a.Preferences().StringWithFallback("server_port", "8080")
+					if newIP != currentIP || newPort != currentPort {
+						cancelStream()
+						return
+					}
+				}
+			}
+		}(ip, port)
 
-func fetchAndUpdateStats(a fyne.App, c *client.HTTPClient, ip, port string, cpu, mem, temp *widget.Label) {
-	s, err := client.FetchSystemStatus(c, ip, port)
-	if err != nil {
-		logMonitorErr(a, err.Error())
-		return
+		client.MonitorStream(streamCtx, ip, port, func(s *client.SystemStatus) {
+			lastMonErr = ""
+			updateLabels(s, cpu, mem, temp)
+		}, func(err error) {
+			logMonitorErr(a, err.Error())
+		})
+		
+		cancelStream()
+		select {
+		case <-mainCtx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
 	}
-	lastMonErr = ""
-	updateLabels(s, cpu, mem, temp)
 }
 
 func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBox *fyne.Container, w fyne.Window) {

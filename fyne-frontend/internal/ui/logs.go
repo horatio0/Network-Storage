@@ -12,15 +12,31 @@ import (
 
 func createLogsView(a fyne.App, unused interface{}) fyne.CanvasObject {
 	logs := LoadLogs(a)
-	vbox := container.NewVBox()
-	for _, l := range logs {
-		vbox.Add(buildLogText(l))
-	}
+	
+	list := widget.NewList(
+		func() int { return len(logs) },
+		func() fyne.CanvasObject {
+			t := canvas.NewText("", color.White)
+			t.TextSize = 12
+			t.TextStyle = fyne.TextStyle{Monospace: true}
+			return t
+		},
+		func(i widget.ListItemID, o fyne.CanvasObject) {
+			t := o.(*canvas.Text)
+			t.Text = logs[i].Time + " - " + logs[i].Message
+			t.Refresh()
+		},
+	)
+	
 	bg := canvas.NewRectangle(color.NRGBA{R: 20, G: 20, B: 20, A: 255})
-	stack := container.NewStack(bg, container.NewPadded(container.NewScroll(vbox)))
+	stack := container.NewStack(bg, list)
 
 	title := widget.NewLabelWithStyle("System Logs", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	clearBtn := widget.NewButton("Clear", func() { ClearLogs(a) })
+	clearBtn := widget.NewButton("Clear", func() { 
+		ClearLogs(a)
+		logs = LoadLogs(a)
+		list.Refresh() 
+	})
 	copyBtn := widget.NewButton("Copy", func() {
 		logs := LoadLogs(a)
 		var sb strings.Builder
@@ -35,11 +51,4 @@ func createLogsView(a fyne.App, unused interface{}) fyne.CanvasObject {
 	topBar := container.NewBorder(nil, nil, nil, buttons, title)
 
 	return container.NewBorder(topBar, nil, nil, nil, stack)
-}
-
-func buildLogText(l LogEntry) *canvas.Text {
-	t := canvas.NewText(l.Time+" - "+l.Message, color.White)
-	t.TextSize = 12
-	t.TextStyle = fyne.TextStyle{Monospace: true}
-	return t
 }

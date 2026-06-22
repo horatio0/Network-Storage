@@ -13,9 +13,14 @@ import (
 
 // Handler handles websocket requests for terminal access.
 func Handler(c *gin.Context) {
-	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
-		InsecureSkipVerify: true, // Managed by TailscaleAuth middleware
-	})
+	tsNodeRaw, exists := c.Get("ts_node")
+	if !exists {
+		log.Println("Terminal failed: ts_node not found in context")
+		return
+	}
+	_ = tsNodeRaw.(string)
+
+	conn, err := websocket.Accept(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("failed to accept websocket: %v", err)
 		return

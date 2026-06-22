@@ -99,6 +99,10 @@ func handleSidebarSelect(idx int, a fyne.App, cArea *fyne.Container, c *client.H
 		updateSidebarState(currentTab)
 		return
 	}
+	if idx != 0 && dashboardCancel != nil {
+		dashboardCancel()
+		dashboardCancel = nil
+	}
 	currentTab = idx
 	if idx == 1 || idx == 0 {
 		HasNewLogs = false

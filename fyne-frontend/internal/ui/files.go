@@ -18,22 +18,24 @@ import (
 
 var currentPath string = "/"
 
+var filesData []client.FileInfo
+
 func createFilesView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
-	vbox := container.NewVBox()
+	listContainer := container.NewMax()
 	pathLbl := widget.NewLabel("Path: " + currentPath)
 
-	upBtn := widget.NewButton("Upload", func() { triggerUpload(a, c, w) })
-	newBtn := widget.NewButton("New Directory", func() { promptMkdir(a, c, w, vbox, pathLbl) })
+	upBtn := widget.NewButton("Upload", func() { triggerUpload(a, c, listContainer, pathLbl, w) })
+	newBtn := widget.NewButton("New Directory", func() { promptMkdir(a, c, w, listContainer, pathLbl) })
 
-	go refreshFileList(a, c, vbox, pathLbl, w)
+	go refreshFileList(a, c, listContainer, pathLbl, w)
 
 	top := container.NewHBox(upBtn, newBtn, pathLbl)
 	bg := canvas.NewRectangle(color.NRGBA{R: 20, G: 20, B: 20, A: 255})
-	stack := container.NewStack(bg, container.NewScroll(container.NewPadded(vbox)))
+	stack := container.NewStack(bg, listContainer)
 	return container.NewBorder(top, nil, nil, nil, stack)
 }
 
-func refreshFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
+func refreshFileList(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	if ip == "" {
 		return
@@ -43,10 +45,10 @@ func refreshFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pat
 		fyne.Do(func() { AddLog(a, "File List Error: "+err.Error()) })
 		return
 	}
-	buildFileBrowser(a, c, vbox, pathLbl, files, w)
+	buildFileBrowser(a, c, listContainer, pathLbl, files, w)
 }
 
-func buildFileBrowser(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, files []client.FileInfo, w fyne.Window) {
+func buildFileBrowser(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, files []client.FileInfo, w fyne.Window) {
 	sort.Slice(files, func(i, j int) bool {
 		if files[i].IsDir && !files[j].IsDir {
 			return true
@@ -65,47 +67,88 @@ func buildFileBrowser(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pa
 
 	fyne.Do(func() {
 		pathLbl.SetText("Path: " + currentPath)
-		configureFileList(a, c, vbox, pathLbl, items, w)
-		vbox.Refresh()
+		filesData = items
+		if len(listContainer.Objects) == 0 {
+			listContainer.Objects = []fyne.CanvasObject{createFileWidgetList(a, c, listContainer, pathLbl, w)}
+		} else {
+			listContainer.Objects[0].(*widget.List).Refresh()
+		}
+		listContainer.Refresh()
 	})
 }
 
-func configureFileList(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, items []client.FileInfo, w fyne.Window) {
-	vbox.Objects = nil
-	for _, i := range items {
-		vbox.Add(createFileRow(a, c, vbox, pathLbl, i, w))
+func createFileWidgetList(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, w fyne.Window) *widget.List {
+	list := widget.NewList(
+		func() int { return len(filesData) },
+		func() fyne.CanvasObject {
+			icon := widget.NewIcon(theme.FolderIcon())
+			label := canvas.NewText("", color.White)
+			dlBtn := widget.NewButton("Download", nil)
+			delBtn := widget.NewButton("Delete", nil)
+			btnBox := container.NewHBox(dlBtn, delBtn)
+			return container.NewBorder(nil, nil, icon, btnBox, label)
+		},
+		func(id widget.ListItemID, o fyne.CanvasObject) {
+			item := filesData[id]
+			border := o.(*fyne.Container)
+			
+			var icon *widget.Icon
+			var label *canvas.Text
+			var btnBox *fyne.Container
+			for _, obj := range border.Objects {
+				switch v := obj.(type) {
+				case *widget.Icon:
+					icon = v
+				case *canvas.Text:
+					label = v
+				case *fyne.Container:
+					btnBox = v
+				}
+			}
+
+			label.Text = item.Name
+			label.Refresh()
+
+			if item.IsDir {
+				icon.SetResource(theme.FolderIcon())
+				icon.Show()
+			} else {
+				icon.Hide()
+			}
+
+			if item.Name == ".." {
+				btnBox.Hide()
+			} else {
+				btnBox.Show()
+				dlBtn := btnBox.Objects[0].(*widget.Button)
+				delBtn := btnBox.Objects[1].(*widget.Button)
+				
+				if item.IsDir {
+					dlBtn.Hide()
+				} else {
+					dlBtn.Show()
+					dlBtn.OnTapped = func() { triggerDownload(a, c, item.Name) }
+				}
+				
+				delBtn.OnTapped = func() { promptDelete(a, c, w, listContainer, pathLbl, item.Name) }
+			}
+		},
+	)
+	
+	list.OnSelected = func(id widget.ListItemID) {
+		list.Unselect(id)
+		handleFileClick(a, c, listContainer, pathLbl, filesData[id], w)
 	}
+	
+	return list
 }
 
-func createFileRow(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, i client.FileInfo, w fyne.Window) fyne.CanvasObject {
-	t := canvas.NewText(i.Name, color.White)
-
-	var display fyne.CanvasObject = t
-	if i.IsDir {
-		icon := widget.NewIcon(theme.FolderIcon())
-		display = container.NewHBox(icon, t)
-	}
-
-	tap := newTappable(func() { handleFileClick(a, c, vbox, pathLbl, i, w) })
-
-	if i.Name == ".." {
-		return container.NewStack(display, tap)
-	}
-	delBtn := widget.NewButton("Delete", func() { promptDelete(a, c, w, vbox, pathLbl, i.Name) })
-	if !i.IsDir {
-		dlBtn := widget.NewButton("Download", func() { triggerDownload(a, c, i.Name) })
-		actions := container.NewHBox(dlBtn, delBtn)
-		return container.NewBorder(nil, nil, nil, actions, container.NewStack(display, tap))
-	}
-	return container.NewBorder(nil, nil, nil, delBtn, container.NewStack(display, tap))
-}
-
-func handleFileClick(a fyne.App, c *client.HTTPClient, vbox *fyne.Container, pathLbl *widget.Label, f client.FileInfo, w fyne.Window) {
+func handleFileClick(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, f client.FileInfo, w fyne.Window) {
 	if !f.IsDir {
 		return
 	}
 	updateCurrentPath(f.Name)
-	go refreshFileList(a, c, vbox, pathLbl, w)
+	go refreshFileList(a, c, listContainer, pathLbl, w)
 }
 
 func updateCurrentPath(name string) {
@@ -128,19 +171,20 @@ func moveUpDirectory() {
 	}
 }
 
-func triggerUpload(a fyne.App, c *client.HTTPClient, w fyne.Window) {
+func triggerUpload(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	d := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil || reader == nil {
 			return
 		}
-		go uploadWorker(a, c, ip, port, reader.URI().Path(), currentPath)
+		reader.Close()
+		go uploadWorker(a, c, ip, port, reader.URI().Path(), currentPath, listContainer, pathLbl, w)
 	}, w)
 	d.Resize(fyne.NewSize(800, 600))
 	d.Show()
 }
 
-func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir string) {
+func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir string, listContainer *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
 	err := client.UploadFile(c, ip, port, path, targetDir)
 	fyne.Do(func() {
 		if err != nil {
@@ -149,6 +193,7 @@ func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir st
 			AddLog(a, "Uploaded: "+filepath.Base(path))
 		}
 	})
+	refreshFileList(a, c, listContainer, pathLbl, w)
 }
 
 func triggerDownload(a fyne.App, c *client.HTTPClient, filename string) {

@@ -37,6 +37,8 @@
 
 - **URL**: `/api/v1/files/upload`
 - **Method**: `POST`
+- **Query Params**:
+  - `path`: 업로드할 대상 디렉터리의 상대 경로 (예: `/` 또는 `/subfolder`). 생략 시 기본 디렉터리로 업로드됩니다.
 - **Content-Type**: `multipart/form-data`
 - **Form Data**:
   - `file`: 업로드할 파일 객체
@@ -56,7 +58,7 @@
 - **URL**: `/api/v1/files/download`
 - **Method**: `GET`
 - **Query Params**:
-  - `filename`: 다운로드할 파일명 (단일 파일 이름만 허용. 디렉터리 이름 X)
+  - `path`: 다운로드할 대상 파일의 상대 경로 (예: `/example.txt`, `/subfolder/example.txt`)
 - **Response**:
   - **Status 200 OK**: 파일 바이너리 데이터
   - **Status 404 Not Found**: 파일을 찾을 수 없음

@@ -78,12 +78,12 @@ Network-Storage/
 
 ---
 
-## 설치/삭제하기 (Install/Uninstall)
+## 설치/배포하기 (Install/Deploy)
 
 ### Client
-- **설치:** `Network Storage/fyne-frontend/scripts/install.sh` 실행
-- **삭제:** `Network Storage/fyne-frontend/scripts/uninstall.sh` 실행
+- **통합 빌드:** `Network Storage/fyne-frontend/scripts/build_all.sh` 스크립트를 실행합니다.
+- `fyne package`를 통해 Linux(`.tar.xz`), Windows(`.exe`), Android(`.apk`)용 패키지가 자동 생성되며, 결과물은 `fyne-frontend/release/` 폴더에 저장됩니다.
 
 ### Server
-1. `Network Storage/backend/scripts/build.sh` 스크립트를 실행하여 빌드합니다.
-2. 빌드가 완료되면 `Network Storage/backend/bin/` 디렉터리에 생성된 실행 파일을 통해 서버를 구동할 수 있습니다.
+1. 우분투 환경에서 `Network Storage/backend/scripts/install.sh` 스크립트를 실행합니다. (`sudo` 권한 필요)
+2. `go build`를 통해 컴파일된 후 `/usr/local/bin`에 설치되며, 백그라운드 구동을 위한 `systemd` 서비스(`network-storage.service`)가 자동으로 등록되고 시작됩니다.

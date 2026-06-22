@@ -20,6 +20,7 @@ type Message struct {
 type Client struct {
 	ID   string
 	Conn *websocket.Conn
+	mu   sync.Mutex
 }
 
 type Hub struct {
@@ -40,11 +41,13 @@ func (h *Hub) register(c *Client) {
 	log.Printf("Signaling client registered: %s", c.ID)
 }
 
-func (h *Hub) unregister(id string) {
+func (h *Hub) unregister(c *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.clients, id)
-	log.Printf("Signaling client unregistered: %s", id)
+	if existing, ok := h.clients[c.ID]; ok && existing == c {
+		delete(h.clients, c.ID)
+		log.Printf("Signaling client unregistered: %s", c.ID)
+	}
 }
 
 func (h *Hub) relay(msg Message) {
@@ -63,7 +66,11 @@ func (h *Hub) relay(msg Message) {
 		return
 	}
 
-	if err := targetClient.Conn.Write(context.Background(), websocket.MessageText, data); err != nil {
+	targetClient.mu.Lock()
+	err = targetClient.Conn.Write(context.Background(), websocket.MessageText, data)
+	targetClient.mu.Unlock()
+
+	if err != nil {
 		log.Printf("Failed to send message to %s: %v", msg.Target, err)
 	}
 }
@@ -77,9 +84,7 @@ func Handler(hub *Hub) gin.HandlerFunc {
 		}
 		tsNode := tsNodeRaw.(string)
 
-		conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{
-			InsecureSkipVerify: true,
-		})
+		conn, err := websocket.Accept(c.Writer, c.Request, nil)
 		if err != nil {
 			log.Printf("failed to accept websocket for signaling: %v", err)
 			return
@@ -88,7 +93,7 @@ func Handler(hub *Hub) gin.HandlerFunc {
 		client := &Client{ID: tsNode, Conn: conn}
 		hub.register(client)
 		defer func() {
-			hub.unregister(tsNode)
+			hub.unregister(client)
 			conn.Close(websocket.StatusInternalError, "closing")
 		}()
 

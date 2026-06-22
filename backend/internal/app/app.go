@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"central-control-backend/internal/config"
 	"central-control-backend/internal/files"
@@ -48,7 +50,9 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	router.Use(middleware.TailscaleAuth(logger, cfg, tsClient))
 
 	sigHub := signaling.NewHub()
-	setupRoutes(router, cfg, sigHub, tsClient)
+	monitorStreamer := monitor.NewStreamer()
+	go monitorStreamer.Run(context.Background(), 2*time.Second)
+	setupRoutes(router, cfg, sigHub, tsClient, monitorStreamer)
 
 	app := &App{
 		logger:       logger,
@@ -62,7 +66,7 @@ func New(cfg config.AppConfig, configPath string, logger *log.Logger) (*App, err
 	return app, nil
 }
 
-func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub, tsClient *tsclient.LocalClient) {
+func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub, tsClient *tsclient.LocalClient, monitorStreamer *monitor.Streamer) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
@@ -79,13 +83,28 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub, tsC
 		})
 	})
 
-	r.GET("/api/v1/monitor", func(c *gin.Context) {
-		status, err := monitor.GetSystemStatus(c.Request.Context())
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get system status"})
-			return
+	r.GET("/api/v1/monitor/stream", func(c *gin.Context) {
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Flush()
+
+		clientCtx := c.Request.Context()
+		ch := monitorStreamer.Subscribe()
+		defer monitorStreamer.Unsubscribe(ch)
+
+		for {
+			select {
+			case <-clientCtx.Done():
+				return
+			case status, ok := <-ch:
+				if !ok {
+					return
+				}
+				c.SSEvent("message", status)
+				c.Writer.Flush()
+			}
 		}
-		c.JSON(http.StatusOK, status)
 	})
 
 	r.POST("/api/v1/files/upload", files.UploadHandler(cfg.MountPath))

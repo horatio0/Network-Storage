@@ -80,60 +80,25 @@ sudo systemctl restart nfs-kernel-server
 sudo systemctl enable nfs-kernel-server
 ```
 
-### 1.5 Go 백엔드 서버 빌드 및 구동
-백엔드는 제공된 빌드 스크립트를 사용하여 단일 실행 파일로 컴파일할 수 있습니다. 백엔드는 Tailscale의 API를 통해 클라이언트의 신원을 확인하므로, 구동 전 반드시 Tailscale이 실행된 상태여야 합니다.
+### 1.5 Go 백엔드 서버 설치 및 구동
+백엔드는 제공된 자동 설치 스크립트를 사용하여 단일 실행 파일 컴파일부터 데몬 서비스 등록까지 한 번에 완료할 수 있습니다. 백엔드는 Tailscale의 API를 통해 클라이언트의 신원을 확인하므로, 구동 전 반드시 Tailscale이 실행된 상태여야 합니다.
 
 ```bash
 cd backend
-# 실행 권한 부여 및 빌드 스크립트 실행
-chmod +x scripts/build.sh
-./scripts/build.sh
-
-# 빌드가 완료되면 bin/ 디렉터리에 backend-server 실행 파일이 생성됩니다.
-# 수동으로 직접 실행하려면 아래 명령어를 입력합니다.
-./bin/backend-server
+# 실행 권한 부여 및 설치 스크립트 실행 (sudo 권한 필요)
+chmod +x scripts/install.sh
+sudo ./scripts/install.sh
 ```
+설치 스크립트는 컴파일된 바이너리를 `/usr/local/bin`으로 복사하고, 즉시 백그라운드 서비스(`systemd`)로 등록하여 서버를 구동합니다.
+### 1.6 백엔드 Systemd 서비스 관리
+위의 `install.sh` 스크립트를 실행했다면 `network-storage.service`라는 이름으로 Systemd 서비스가 이미 등록 및 실행 중입니다. 서버가 재부팅되어도 자동으로 시작됩니다.
 
-### 1.6 백엔드를 Systemd 서비스로 등록 (권장)
-서버 재부팅 시에도 자동으로 백엔드가 실행되도록 Systemd 데몬 서비스로 등록하는 방법입니다.
-
-1. 서비스 설정 파일 생성
-`sudo nano /etc/systemd/system/network-storage-backend.service`를 입력하고 아래 내용을 작성합니다. (경로는 자신의 환경에 맞게 수정하세요)
-
-```ini
-[Unit]
-Description=Network Storage Backend Server
-After=network-online.target tailscaled.service
-Wants=network-online.target tailscaled.service
-
-[Service]
-Type=simple
-# 실제 backend-server 파일이 위치한 절대 경로
-ExecStart=/home/pi/backend/bin/backend-server
-# 백엔드 서버를 실행할 OS 유저 계정 (예: pi, ubuntu 등)
-User=pi
-# WorkingDirectory를 backend 폴더의 절대 경로로 지정 (configs/app.json 등을 올바르게 찾기 위해 필요)
-WorkingDirectory=/home/pi/backend
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-2. 서비스 데몬 리로드 및 활성화
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable network-storage-backend
-sudo systemctl start network-storage-backend
-```
-
-3. 서비스 상태 및 로그 확인
+서비스 상태 및 로그 확인은 다음 명령어를 사용하세요:
 ```bash
 # 상태 확인
-sudo systemctl status network-storage-backend
+sudo systemctl status network-storage
 # 실시간 로그 확인
-journalctl -u network-storage-backend -f
+sudo journalctl -u network-storage -f
 ```
 
 ### 1.7 방화벽(Firewall) 개방 설정

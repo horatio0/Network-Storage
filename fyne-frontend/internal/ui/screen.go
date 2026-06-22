@@ -51,20 +51,24 @@ func loadScreenDevices(a fyne.App, c *client.HTTPClient, sel *widget.Select) {
 }
 
 func updateDeviceSelect(sel *widget.Select, devs []client.Device) {
-	hostMap = make(map[string]string)
 	var opts []string
+	newMap := make(map[string]string)
 	for _, d := range devs {
-		parseDeviceOption(d, &opts)
+		parseDeviceOption(d, &opts, newMap)
 	}
-	fyne.Do(func() { sel.Options = opts; sel.Refresh() })
+	fyne.Do(func() {
+		hostMap = newMap
+		sel.Options = opts
+		sel.Refresh()
+	})
 }
 
-func parseDeviceOption(d client.Device, opts *[]string) {
+func parseDeviceOption(d client.Device, opts *[]string, newMap map[string]string) {
 	os := strings.ToLower(d.OS)
 	if os == "windows" || os == "android" {
 		lbl := fmt.Sprintf("%s [%s]", d.Name, d.IPs[0])
 		*opts = append(*opts, lbl)
-		hostMap[lbl] = d.Name
+		newMap[lbl] = d.Name
 	}
 }
 
@@ -86,7 +90,7 @@ func startRtc(a fyne.App, w fyne.Window, target string, isHost bool, onFrame fun
 	if ip == "" {
 		return
 	}
-	startRtcController(a, w, ip, port, target, isHost, onFrame)
+	go startRtcController(a, w, ip, port, target, isHost, onFrame)
 }
 
 func startRtcController(a fyne.App, w fyne.Window, ip, port, tgt string, host bool, cb func([]byte)) {
@@ -103,7 +107,7 @@ func startRtcController(a fyne.App, w fyne.Window, ip, port, tgt string, host bo
 		errCb(err)
 		return
 	}
-	rtc = c
-	rtc.StartSignaling()
+	fyne.Do(func() { rtc = c })
+	c.StartSignaling()
 	fyne.Do(func() { AddLog(a, "WebRTC Started") })
 }

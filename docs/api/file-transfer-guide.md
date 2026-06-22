@@ -19,11 +19,14 @@
 
 ### Request
 
+- **Query Parameters:**
+  - `path`: 업로드할 대상 디렉터리의 상대 경로 (선택. 예: `/subfolder`).
+
 `file` 필드에 업로드할 파일 데이터를 담아 전송해야 합니다.
 
 **cURL 예시:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/files/upload \
+curl -X POST "http://localhost:8080/api/v1/files/upload?path=/subfolder" \
   -F "file=@/path/to/local/test.txt"
 ```
 
@@ -52,18 +55,18 @@ curl -X POST http://localhost:8080/api/v1/files/upload \
 
 | 파라미터 | 타입 | 필수 여부 | 설명 |
 | :--- | :--- | :--- | :--- |
-| `filename` | string | 필수 | 다운로드할 파일의 이름 |
+| `path` | string | 필수 | 다운로드할 대상 파일의 상대 경로 |
 
 **cURL 예시:**
 ```bash
-curl -O -J http://localhost:8080/api/v1/files/download?filename=test.txt
+curl -O -J "http://localhost:8080/api/v1/files/download?path=/test.txt"
 ```
 
 ### Response
 
 - **200 OK:** 파일 스트림 반환 (`Content-Type: application/octet-stream` 등)
-- **400 Bad Request:** `filename` 쿼리 파라미터가 누락되었거나 유효하지 않은 경우.
+- **400 Bad Request:** `path` 쿼리 파라미터가 누락되었거나 유효하지 않은 경우.
 - **404 Not Found:** 요청한 파일이 존재하지 않는 경우.
 
 ### 보안 참고 (Path Traversal 방지)
-클라이언트가 `filename=../../../etc/passwd`와 같이 상위 디렉터리 접근을 시도하더라도, 서버는 안전하게 파일의 기본 이름(`passwd`)만 추출하여 `tmp_mount` 내부에서만 탐색합니다. 따라서 클라이언트는 파일명만 정확히 전달하면 됩니다.
+클라이언트가 `path=../../../etc/passwd`와 같이 상위 디렉터리 접근을 시도하더라도, 서버는 `mountPath`를 벗어나는 경로 접근을 식별하고 403 Forbidden 오류를 반환하여 안전하게 방어합니다.

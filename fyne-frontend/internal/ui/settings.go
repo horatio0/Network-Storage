@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -54,6 +55,9 @@ func buildSettingsForm(ip, port, share, local, pwd *widget.Entry, saveBtn *widge
 }
 
 func getDefaultMountPath() string {
+	if runtime.GOOS == "windows" {
+		return "Z:"
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Documents", "HomeNAS")
 }
