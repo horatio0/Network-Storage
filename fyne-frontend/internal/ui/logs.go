@@ -27,6 +27,7 @@ func createLogsView(a fyne.App, unused interface{}) fyne.CanvasObject {
 			t.Refresh()
 		},
 	)
+	list.HideSeparators = true
 	
 	bg := canvas.NewRectangle(color.NRGBA{R: 20, G: 20, B: 20, A: 255})
 	stack := container.NewStack(bg, list)
@@ -43,9 +44,7 @@ func createLogsView(a fyne.App, unused interface{}) fyne.CanvasObject {
 		for _, l := range logs {
 			sb.WriteString(l.Time + " - " + l.Message + "\n")
 		}
-		if len(a.Driver().AllWindows()) > 0 {
-			a.Driver().AllWindows()[0].Clipboard().SetContent(sb.String())
-		}
+		a.Clipboard().SetContent(sb.String())
 	})
 	buttons := container.NewHBox(copyBtn, clearBtn)
 	topBar := container.NewBorder(nil, nil, nil, buttons, title)

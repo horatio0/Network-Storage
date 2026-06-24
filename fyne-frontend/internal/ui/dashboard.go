@@ -168,7 +168,7 @@ func executeMount(a fyne.App, btn *widget.Button) {
 		matched, _ := regexp.MatchString(`^[a-zA-Z]:$`, local)
 		if !matched {
 			win := a.Driver().AllWindows()[0]
-			dialog.ShowError(errors.New("윈도우에서는 Z:와 같은 드라이브 문자를 사용해야 합니다."), win)
+			dialog.ShowError(errors.New("윈도우에서는 Z:와 같은 드라이브 문자를 사용해야 합니다"), win)
 			return
 		}
 	}

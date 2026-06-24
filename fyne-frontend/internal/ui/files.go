@@ -3,6 +3,7 @@ package ui
 import (
 	"image/color"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,7 +22,7 @@ var currentPath string = "/"
 var filesData []client.FileInfo
 
 func createFilesView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.CanvasObject {
-	listContainer := container.NewMax()
+	listContainer := container.NewStack()
 	pathLbl := widget.NewLabel("Path: " + currentPath)
 
 	upBtn := widget.NewButton("Upload", func() { triggerUpload(a, c, listContainer, pathLbl, w) })
@@ -134,6 +135,7 @@ func createFileWidgetList(a fyne.App, c *client.HTTPClient, listContainer *fyne.
 			}
 		},
 	)
+	list.HideSeparators = true
 	
 	list.OnSelected = func(id widget.ListItemID) {
 		list.Unselect(id)
@@ -152,23 +154,7 @@ func handleFileClick(a fyne.App, c *client.HTTPClient, listContainer *fyne.Conta
 }
 
 func updateCurrentPath(name string) {
-	if name == ".." {
-		moveUpDirectory()
-		return
-	}
-	if currentPath == "/" {
-		currentPath = "/" + name
-	} else {
-		currentPath = currentPath + "/" + name
-	}
-}
-
-func moveUpDirectory() {
-	parts := strings.Split(strings.TrimSuffix(currentPath, "/"), "/")
-	currentPath = "/" + strings.Join(parts[:len(parts)-1], "/")
-	if currentPath == "" || currentPath == "//" {
-		currentPath = "/"
-	}
+	currentPath = path.Join(currentPath, name)
 }
 
 func triggerUpload(a fyne.App, c *client.HTTPClient, listContainer *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
@@ -200,12 +186,7 @@ func triggerDownload(a fyne.App, c *client.HTTPClient, filename string) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	home, _ := os.UserHomeDir()
 	savePath := filepath.Join(home, "Downloads", filename)
-	target := currentPath
-	if target == "/" {
-		target = "/" + filename
-	} else {
-		target = target + "/" + filename
-	}
+	target := path.Join(currentPath, filename)
 	go downloadWorker(a, c, ip, port, target, savePath)
 }
 
@@ -226,12 +207,7 @@ func promptMkdir(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Con
 
 	submitFunc := func() {
 		if entry.Text != "" {
-			target := currentPath
-			if target == "/" {
-				target = "/" + entry.Text
-			} else {
-				target = target + "/" + entry.Text
-			}
+			target := path.Join(currentPath, entry.Text)
 			go executeMkdir(a, c, target, vbox, pathLbl, w)
 		}
 		if d != nil {
@@ -266,12 +242,7 @@ func executeMkdir(a fyne.App, c *client.HTTPClient, target string, vbox *fyne.Co
 func promptDelete(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Container, pathLbl *widget.Label, name string) {
 	dialog.ShowConfirm("Delete", "Delete "+name+"?", func(b bool) {
 		if b {
-			target := currentPath
-			if target == "/" {
-				target = "/" + name
-			} else {
-				target = target + "/" + name
-			}
+			target := path.Join(currentPath, name)
 			go executeDelete(a, c, target, vbox, pathLbl, w)
 		}
 	}, w)

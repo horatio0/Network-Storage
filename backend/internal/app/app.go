@@ -73,39 +73,7 @@ func setupRoutes(r *gin.Engine, cfg config.AppConfig, sigHub *signaling.Hub, tsC
 		})
 	})
 
-	r.GET("/hello", func(c *gin.Context) {
-		c.File("internal/app/static/hello.html")
-	})
-
-	r.GET("/api/v1/hello", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Hello from Gin Harness!",
-		})
-	})
-
-	r.GET("/api/v1/monitor/stream", func(c *gin.Context) {
-		c.Writer.Header().Set("Content-Type", "text/event-stream")
-		c.Writer.Header().Set("Cache-Control", "no-cache")
-		c.Writer.Header().Set("Connection", "keep-alive")
-		c.Writer.Flush()
-
-		clientCtx := c.Request.Context()
-		ch := monitorStreamer.Subscribe()
-		defer monitorStreamer.Unsubscribe(ch)
-
-		for {
-			select {
-			case <-clientCtx.Done():
-				return
-			case status, ok := <-ch:
-				if !ok {
-					return
-				}
-				c.SSEvent("message", status)
-				c.Writer.Flush()
-			}
-		}
-	})
+	r.GET("/api/v1/monitor/stream", monitor.StreamHandler(monitorStreamer))
 
 	r.POST("/api/v1/files/upload", files.UploadHandler(cfg.MountPath))
 	r.GET("/api/v1/files/download", files.DownloadHandler(cfg.MountPath))

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"io"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -17,13 +18,15 @@ import (
 type wsWrapper struct {
 	conn *websocket.Conn
 	r    io.Reader
+	mu   sync.Mutex
 }
 
 func (w *wsWrapper) Read(p []byte) (int, error) {
 	if w.r == nil {
 		_, r, err := w.conn.NextReader()
 		if err != nil {
-			return 0, err
+			// 웹소켓 연결이 끊어지거나 실패한 경우 io.EOF를 반환하여 루프 탈출
+			return 0, io.EOF
 		}
 		w.r = r
 	}
@@ -32,16 +35,41 @@ func (w *wsWrapper) Read(p []byte) (int, error) {
 		w.r = nil
 		return n, nil
 	}
-	return n, err
+	if err != nil {
+		w.r = nil
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 func (w *wsWrapper) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	err := w.conn.WriteMessage(websocket.BinaryMessage, p)
 	return len(p), err
 }
 
+func (w *wsWrapper) WriteText(p []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.conn.WriteMessage(websocket.TextMessage, p)
+}
+
 func (w *wsWrapper) Close() error {
 	return w.conn.Close()
+}
+
+type termLayout struct{}
+
+func (l *termLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	for _, o := range objects {
+		o.Resize(size)
+		o.Move(fyne.NewPos(0, 0))
+	}
+}
+
+func (l *termLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(100, 100) // Allow shrinking smaller than default minimum size
 }
 
 var (
@@ -94,8 +122,19 @@ func connectTerminal(a fyne.App, url string, stack *fyne.Container) {
 
 		term := terminal.New()
 		ws := &wsWrapper{conn: conn}
+
+		ch := make(chan terminal.Config)
+		term.AddListener(ch)
+		go func() {
+			for conf := range ch {
+				msg := fmt.Sprintf(`{"cols":%d,"rows":%d}`, conf.Columns, conf.Rows)
+				ws.WriteText([]byte(msg))
+			}
+		}()
 		go func() {
 			_ = term.RunWithConnection(ws, ws)
+			term.RemoveListener(ch)
+			close(ch)
 		}()
 		go func() {
 			time.Sleep(200 * time.Millisecond)
@@ -103,7 +142,7 @@ func connectTerminal(a fyne.App, url string, stack *fyne.Container) {
 		}()
 		bg := canvas.NewRectangle(color.NRGBA{R: 0, G: 0, B: 0, A: 255})
 		fyne.Do(func() {
-			stack.Objects = []fyne.CanvasObject{container.NewMax(bg, term)}
+			stack.Objects = []fyne.CanvasObject{container.New(&termLayout{}, bg, term)}
 			stack.Refresh()
 		})
 	}()

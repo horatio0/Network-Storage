@@ -23,7 +23,7 @@ var (
 )
 
 func SetupMainWindow(a fyne.App, w fyne.Window, c *client.HTTPClient) {
-	contentArea := container.NewMax()
+	contentArea := container.NewStack()
 	sidebar := createSidebar(a, contentArea, c, w)
 	setupLogCallback(a, contentArea, c, w)
 	handleSidebarSelect(0, a, contentArea, c, w)

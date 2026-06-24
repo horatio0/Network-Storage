@@ -24,19 +24,19 @@ mkdir -p release
 # 1. Build for Linux
 echo "----------------------------------------"
 echo "[1/3] Packaging for Linux..."
-fyne package -os linux
+/home/gyumin/go/bin/fyne package -os linux
 mv -f *.tar.xz release/
 
 # 2. Build for Windows
 echo "----------------------------------------"
 echo "[2/3] Packaging for Windows..."
-fyne package -os windows
+/home/gyumin/go/bin/fyne package -os windows
 mv -f *.exe release/
 
 # 3. Build for Android
 echo "----------------------------------------"
 echo "[3/3] Packaging for Android..."
-fyne package -os android -appID com.network.storage.client
+/home/gyumin/go/bin/fyne package -os android -appID com.network.storage.client
 mv -f *.apk release/
 
 echo "----------------------------------------"

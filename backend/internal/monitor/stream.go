@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Streamer struct {
@@ -73,4 +75,30 @@ func (s *Streamer) cleanup() {
 		close(ch)
 	}
 	s.clients = make(map[chan SystemStatus]struct{})
+}
+
+func StreamHandler(streamer *Streamer) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Content-Type", "text/event-stream")
+		c.Writer.Header().Set("Cache-Control", "no-cache")
+		c.Writer.Header().Set("Connection", "keep-alive")
+		c.Writer.Flush()
+
+		clientCtx := c.Request.Context()
+		ch := streamer.Subscribe()
+		defer streamer.Unsubscribe(ch)
+
+		for {
+			select {
+			case <-clientCtx.Done():
+				return
+			case status, ok := <-ch:
+				if !ok {
+					return
+				}
+				c.SSEvent("message", status)
+				c.Writer.Flush()
+			}
+		}
+	}
 }
