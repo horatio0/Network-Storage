@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
+	"image"
 	"image/color"
+	_ "image/jpeg"
 	"strings"
 
 	"network-storage-client/internal/client"
@@ -33,7 +36,17 @@ func buildScreenLayout(a fyne.App, s *widget.Select, bg *canvas.Rectangle, v *ca
 	btn := widget.NewButton("View Remote Screen", func() {
 		startRtc(a, w, hostMap[s.Selected], false, buildFrameCb(v))
 	})
-	top := container.NewHBox(widget.NewLabel("Target:"), selBox, btn)
+	stopBtn := widget.NewButton("Stop / Disconnect", func() {
+		if rtc != nil {
+			rtc.Close()
+			rtc = nil
+			AddLog(a, "WebRTC Stopped")
+			v.Image = nil
+			v.Resource = nil
+			v.Refresh()
+		}
+	})
+	top := container.NewHBox(widget.NewLabel("Target:"), selBox, btn, stopBtn)
 	return container.NewBorder(top, nil, nil, nil, container.NewStack(bg, v))
 }
 
@@ -74,8 +87,13 @@ func parseDeviceOption(d client.Device, opts *[]string, newMap map[string]string
 
 func buildFrameCb(v *canvas.Image) func([]byte) {
 	return func(data []byte) {
+		img, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			return
+		}
 		fyne.Do(func() {
-			v.Resource = fyne.NewStaticResource("frame.jpg", data)
+			v.Image = img
+			v.Resource = nil
 			v.Refresh()
 		})
 	}

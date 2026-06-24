@@ -24,6 +24,15 @@ type Controller struct {
 	onError func(error)
 }
 
+func (c *Controller) Close() {
+	if c.pc != nil {
+		c.pc.Close()
+	}
+	if c.ws != nil {
+		c.ws.Close()
+	}
+}
+
 func NewController(url, tgt string, host bool, cb func([]byte), errCb func(error)) (*Controller, error) {
 	ws, err := dialWebsocket(url)
 	if err != nil {
@@ -48,8 +57,11 @@ func initController(c *Controller) (*Controller, error) {
 
 func setupStateChange(c *Controller) {
 	c.pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		if s == webrtc.PeerConnectionStateFailed && c.onError != nil {
-			c.onError(fmt.Errorf("state: %s", s))
+		if s == webrtc.PeerConnectionStateFailed || s == webrtc.PeerConnectionStateClosed {
+			if s == webrtc.PeerConnectionStateFailed && c.onError != nil {
+				c.onError(fmt.Errorf("state: %s", s))
+			}
+			c.Close()
 		}
 	})
 }
@@ -126,7 +138,12 @@ func handleSigMsg(c *Controller, msg []byte) {
 
 func handleOffer(c *Controller, p string) {
 	var sdp webrtc.SessionDescription
-	json.Unmarshal([]byte(p), &sdp)
+	if err := json.Unmarshal([]byte(p), &sdp); err != nil {
+		if c.onError != nil {
+			c.onError(fmt.Errorf("unmarshal offer: %v", err))
+		}
+		return
+	}
 	c.pc.SetRemoteDescription(sdp)
 	ans, _ := c.pc.CreateAnswer(nil)
 	c.pc.SetLocalDescription(ans)
@@ -136,12 +153,22 @@ func handleOffer(c *Controller, p string) {
 
 func handleAnswer(c *Controller, p string) {
 	var sdp webrtc.SessionDescription
-	json.Unmarshal([]byte(p), &sdp)
+	if err := json.Unmarshal([]byte(p), &sdp); err != nil {
+		if c.onError != nil {
+			c.onError(fmt.Errorf("unmarshal answer: %v", err))
+		}
+		return
+	}
 	c.pc.SetRemoteDescription(sdp)
 }
 
 func handleCandidate(c *Controller, p string) {
 	var ice webrtc.ICECandidateInit
-	json.Unmarshal([]byte(p), &ice)
+	if err := json.Unmarshal([]byte(p), &ice); err != nil {
+		if c.onError != nil {
+			c.onError(fmt.Errorf("unmarshal candidate: %v", err))
+		}
+		return
+	}
 	c.pc.AddICECandidate(ice)
 }

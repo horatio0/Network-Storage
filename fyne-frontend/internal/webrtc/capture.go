@@ -22,9 +22,13 @@ func setupDataChannelHost(c *Controller) {
 func sendScreenFrames(dc *webrtc.DataChannel) {
 	ticker := time.NewTicker(time.Second / 5) // 5 FPS
 	defer ticker.Stop()
+	var buf bytes.Buffer
 	for range ticker.C {
 		if dc.ReadyState() != webrtc.DataChannelStateOpen {
 			break
+		}
+		if screenshot.NumActiveDisplays() == 0 {
+			continue
 		}
 		bounds := screenshot.GetDisplayBounds(0)
 		img, err := screenshot.CaptureRect(bounds)
@@ -32,7 +36,7 @@ func sendScreenFrames(dc *webrtc.DataChannel) {
 			continue
 		}
 
-		var buf bytes.Buffer
+		buf.Reset()
 		jpeg.Encode(&buf, img, &jpeg.Options{Quality: 50})
 		dc.Send(buf.Bytes())
 	}

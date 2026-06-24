@@ -16,9 +16,9 @@ fi
 # Navigate to backend directory
 cd "$(dirname "$0")/.."
 
-echo "[1/4] Building backend binary using go build..."
-# Build the binary
-go build -o network-storage-server .
+echo "[1/4] Building backend binary for ARM64 (Linux) using go build..."
+# Build the binary for ARM architecture (Raspberry Pi, etc.)
+env GOOS=linux GOARCH=arm64 go build -o network-storage-server .
 
 echo "[2/4] Moving binary to /NS/server/network-storage-server..."
 mkdir -p /NS/server

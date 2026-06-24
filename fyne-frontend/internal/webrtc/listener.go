@@ -3,13 +3,17 @@ package webrtc
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v3"
 )
 
-var hostController *Controller
+var (
+	hostController *Controller
+	hostMu         sync.Mutex
+)
 
 func StartBackgroundListener(ip, port string) {
 	if ip == "" {
@@ -47,12 +51,21 @@ func handleAutoSig(ws *websocket.Conn, msg []byte) {
 	}
 	if s.Type == "offer" {
 		acceptOffer(ws, &s)
-	} else if s.Type == "candidate" && hostController != nil {
-		handleCandidate(hostController, s.Payload)
+	} else if s.Type == "candidate" {
+		hostMu.Lock()
+		hc := hostController
+		hostMu.Unlock()
+		if hc != nil {
+			handleCandidate(hc, s.Payload)
+		}
 	}
 }
 
 func acceptOffer(ws *websocket.Conn, s *SigMsg) {
+	hostMu.Lock()
+	if hostController != nil {
+		hostController.Close()
+	}
 	c := &Controller{ws: ws, target: s.Sender, isHost: true}
 	c.pc, _ = webrtc.NewPeerConnection(webrtc.Configuration{})
 	setupIceHandler(c)
@@ -60,5 +73,6 @@ func acceptOffer(ws *websocket.Conn, s *SigMsg) {
 		dc.OnOpen(func() { go sendScreenFrames(dc) })
 	})
 	hostController = c
+	hostMu.Unlock()
 	handleOffer(c, s.Payload)
 }
