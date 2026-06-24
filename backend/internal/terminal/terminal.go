@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"log"
 	"os"
@@ -51,33 +52,45 @@ func startPty(ctx context.Context) (*os.File, *exec.Cmd, error) {
 	return f, cmd, err
 }
 
+type TerminalMessage struct {
+	Type string `json:"type"`
+	Data string `json:"data,omitempty"`
+	Cols uint16 `json:"cols,omitempty"`
+	Rows uint16 `json:"rows,omitempty"`
+}
+
 func pumpWebsocketToPty(ctx context.Context, conn *websocket.Conn, f *os.File) {
 	defer f.Close()
 	for {
-		typ, b, err := conn.Read(ctx)
+		_, b, err := conn.Read(ctx)
 		if err != nil {
 			return
 		}
-		if typ == websocket.MessageText {
-			handleSizeChange(f, b)
-		} else if typ == websocket.MessageBinary {
-			f.Write(b)
-		}
-	}
-}
 
-func handleSizeChange(f *os.File, b []byte) {
-	var size struct {
-		Cols uint16 `json:"cols"`
-		Rows uint16 `json:"rows"`
-	}
-	if err := json.Unmarshal(b, &size); err == nil && size.Cols > 0 && size.Rows > 0 {
-		pty.Setsize(f, &pty.Winsize{
-			Rows: size.Rows,
-			Cols: size.Cols,
-		})
-	} else {
-		f.Write(b)
+		var msg TerminalMessage
+		if err := json.Unmarshal(b, &msg); err != nil {
+			log.Printf("Failed to unmarshal terminal message: %v", err)
+			continue
+		}
+
+		switch msg.Type {
+		case "input":
+			decoded, err := base64.StdEncoding.DecodeString(msg.Data)
+			if err != nil {
+				log.Printf("Failed to decode base64 input data: %v", err)
+				continue
+			}
+			f.Write(decoded)
+		case "resize":
+			if msg.Cols > 0 && msg.Rows > 0 {
+				pty.Setsize(f, &pty.Winsize{
+					Rows: msg.Rows,
+					Cols: msg.Cols,
+				})
+			}
+		default:
+			log.Printf("Unknown terminal message type: %s", msg.Type)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/base64"
 	"fmt"
 	"image/color"
 	"io"
@@ -42,17 +43,22 @@ func (w *wsWrapper) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+type TerminalMessage struct {
+	Type string `json:"type"`
+	Data string `json:"data,omitempty"`
+	Cols uint16 `json:"cols,omitempty"`
+	Rows uint16 `json:"rows,omitempty"`
+}
+
 func (w *wsWrapper) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	err := w.conn.WriteMessage(websocket.BinaryMessage, p)
+	msg := TerminalMessage{
+		Type: "input",
+		Data: base64.StdEncoding.EncodeToString(p),
+	}
+	err := w.conn.WriteJSON(msg)
 	return len(p), err
-}
-
-func (w *wsWrapper) WriteText(p []byte) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.conn.WriteMessage(websocket.TextMessage, p)
 }
 
 func (w *wsWrapper) Close() error {
@@ -123,18 +129,24 @@ func connectTerminal(a fyne.App, url string, stack *fyne.Container) {
 		term := terminal.New()
 		ws := &wsWrapper{conn: conn}
 
-		ch := make(chan terminal.Config)
-		term.AddListener(ch)
+		configChan := make(chan terminal.Config)
+		term.AddListener(configChan)
+
 		go func() {
-			for conf := range ch {
-				msg := fmt.Sprintf(`{"cols":%d,"rows":%d}`, conf.Columns, conf.Rows)
-				ws.WriteText([]byte(msg))
+			for cfg := range configChan {
+				ws.mu.Lock()
+				msg := TerminalMessage{
+					Type: "resize",
+					Cols: uint16(cfg.Columns),
+					Rows: uint16(cfg.Rows),
+				}
+				ws.conn.WriteJSON(msg)
+				ws.mu.Unlock()
 			}
 		}()
+
 		go func() {
 			_ = term.RunWithConnection(ws, ws)
-			term.RemoveListener(ch)
-			close(ch)
 		}()
 		go func() {
 			time.Sleep(200 * time.Millisecond)
