@@ -108,7 +108,7 @@ func connectTerminal(a fyne.App, url string, stack *fyne.Container) {
 		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
 			fyne.Do(func() {
-				AddLog(a, "Terminal error: "+err.Error())
+				AddErrorLog(a, "Terminal error: "+err.Error(), "WS "+url, err.Error(), 0)
 				
 				errMsg := widget.NewLabel("Connection Failed: " + err.Error())
 				retryBtn := widget.NewButton("Retry", func() {

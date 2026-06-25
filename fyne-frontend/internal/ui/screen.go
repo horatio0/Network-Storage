@@ -40,7 +40,7 @@ func buildScreenLayout(a fyne.App, s *widget.Select, bg *canvas.Rectangle, v *ca
 		if rtc != nil {
 			rtc.Close()
 			rtc = nil
-			AddLog(a, "WebRTC Stopped")
+			AddInfoLog(a, "WebRTC Stopped")
 			v.Image = nil
 			v.Resource = nil
 			v.Refresh()
@@ -115,7 +115,7 @@ func startRtcController(a fyne.App, w fyne.Window, ip, port, tgt string, host bo
 	url := fmt.Sprintf("ws://%s:%s/api/v1/signaling/ws", ip, port)
 	errCb := func(err error) {
 		fyne.Do(func() {
-			AddLog(a, "WebRTC Err: "+err.Error())
+			AddErrorLog(a, "WebRTC Err: "+err.Error(), "WS "+url, err.Error(), 0)
 			dialog.ShowInformation("Connection Error", "WebRTC:\n"+err.Error(), w)
 			rtc = nil
 		})
@@ -127,5 +127,5 @@ func startRtcController(a fyne.App, w fyne.Window, ip, port, tgt string, host bo
 	}
 	fyne.Do(func() { rtc = c })
 	c.StartSignaling()
-	fyne.Do(func() { AddLog(a, "WebRTC Started") })
+	fyne.Do(func() { AddInfoLog(a, "WebRTC Started") })
 }

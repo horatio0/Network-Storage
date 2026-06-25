@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"fmt"
 	"image/color"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,7 +45,10 @@ func refreshFileList(a fyne.App, c *client.HTTPClient, listContainer *fyne.Conta
 	}
 	files, err := client.ListFiles(c, ip, port, currentPath)
 	if err != nil {
-		fyne.Do(func() { AddLog(a, "File List Error: "+err.Error()) })
+		fyne.Do(func() {
+			cmdStr := fmt.Sprintf("GET http://%s:%s/api/v1/files/list?path=%s", ip, port, url.QueryEscape(currentPath))
+			AddErrorLog(a, "File List Error: "+err.Error(), cmdStr, err.Error(), 0)
+		})
 		return
 	}
 	buildFileBrowser(a, c, listContainer, pathLbl, files, w)
@@ -174,9 +179,10 @@ func uploadWorker(a fyne.App, c *client.HTTPClient, ip, port, path, targetDir st
 	err := client.UploadFile(c, ip, port, path, targetDir)
 	fyne.Do(func() {
 		if err != nil {
-			AddLog(a, "Upload Error: "+err.Error())
+			cmdStr := fmt.Sprintf("POST http://%s:%s/api/v1/files/upload?path=%s", ip, port, url.QueryEscape(targetDir))
+			AddErrorLog(a, "Upload Error: "+err.Error(), cmdStr, err.Error(), 0)
 		} else {
-			AddLog(a, "Uploaded: "+filepath.Base(path))
+			AddInfoLog(a, "Uploaded: "+filepath.Base(path))
 		}
 	})
 	refreshFileList(a, c, listContainer, pathLbl, w)
@@ -194,9 +200,10 @@ func downloadWorker(a fyne.App, c *client.HTTPClient, ip, port, file, save strin
 	err := client.DownloadFile(c, ip, port, file, save)
 	fyne.Do(func() {
 		if err != nil {
-			AddLog(a, "Download Error: "+err.Error())
+			cmdStr := fmt.Sprintf("GET http://%s:%s/api/v1/files/download?path=%s", ip, port, url.QueryEscape(file))
+			AddErrorLog(a, "Download Error: "+err.Error(), cmdStr, err.Error(), 0)
 		} else {
-			AddLog(a, "Downloaded to: "+save)
+			AddInfoLog(a, "Downloaded to: "+save)
 		}
 	})
 }
@@ -232,9 +239,12 @@ func promptMkdir(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Con
 func executeMkdir(a fyne.App, c *client.HTTPClient, target string, vbox *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	if err := client.Mkdir(c, ip, port, target); err != nil {
-		fyne.Do(func() { AddLog(a, "Mkdir Error: "+err.Error()) })
+		fyne.Do(func() {
+			cmdStr := fmt.Sprintf("POST http://%s:%s/api/v1/files/mkdir?path=%s", ip, port, url.QueryEscape(target))
+			AddErrorLog(a, "Mkdir Error: "+err.Error(), cmdStr, err.Error(), 0)
+		})
 	} else {
-		fyne.Do(func() { AddLog(a, "Created Dir: "+target) })
+		fyne.Do(func() { AddInfoLog(a, "Created Dir: "+target) })
 		refreshFileList(a, c, vbox, pathLbl, w)
 	}
 }
@@ -251,9 +261,12 @@ func promptDelete(a fyne.App, c *client.HTTPClient, w fyne.Window, vbox *fyne.Co
 func executeDelete(a fyne.App, c *client.HTTPClient, target string, vbox *fyne.Container, pathLbl *widget.Label, w fyne.Window) {
 	ip, port := a.Preferences().StringWithFallback("server_ip", ""), a.Preferences().StringWithFallback("server_port", "8080")
 	if err := client.DeletePath(c, ip, port, target); err != nil {
-		fyne.Do(func() { AddLog(a, "Delete Error: "+err.Error()) })
+		fyne.Do(func() {
+			cmdStr := fmt.Sprintf("DELETE http://%s:%s/api/v1/files/delete?path=%s", ip, port, url.QueryEscape(target))
+			AddErrorLog(a, "Delete Error: "+err.Error(), cmdStr, err.Error(), 0)
+		})
 	} else {
-		fyne.Do(func() { AddLog(a, "Deleted: "+target) })
+		fyne.Do(func() { AddInfoLog(a, "Deleted: "+target) })
 		refreshFileList(a, c, vbox, pathLbl, w)
 	}
 }

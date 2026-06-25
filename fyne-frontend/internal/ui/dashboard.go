@@ -37,9 +37,23 @@ func createMainView(a fyne.App, c *client.HTTPClient, w fyne.Window) fyne.Canvas
 	cpuLbl := widget.NewLabel("CPU: - %")
 	memLbl := widget.NewLabel("Mem: - GB")
 	tempLbl := widget.NewLabel("Temp: - °C")
+	var oldCPUData, oldMemData, oldTempData []float64
+	if cpuChart != nil {
+		oldCPUData = cpuChart.data
+	}
+	if memChart != nil {
+		oldMemData = memChart.data
+	}
+	if tempChart != nil {
+		oldTempData = tempChart.data
+	}
+
 	cpuChart = newLineChart(100)
+	cpuChart.data = oldCPUData
 	memChart = newLineChart(100)
+	memChart.data = oldMemData
 	tempChart = newLineChart(100)
+	tempChart.data = oldTempData
 
 	mBtn := widget.NewButton("", nil)
 	updateMountBtn(a, mBtn)
@@ -188,10 +202,16 @@ func executeMount(a fyne.App, btn *widget.Button) {
 					client.SetSudoPassword("")
 					showSudoDialog(a, btn, "Incorrect password. Please try again.", true)
 				} else {
-					AddLog(a, "Mount Error: "+err.Error())
+					cmdStr := ""
+					if runtime.GOOS == "windows" {
+						cmdStr = fmt.Sprintf(`net use %s \\%s\%s`, local, ip, share)
+					} else {
+						cmdStr = fmt.Sprintf("sudo -S mount -t nfs %s:%s %s", ip, share, local)
+					}
+					AddErrorLog(a, "Mount Error: "+err.Error(), cmdStr, err.Error(), 0)
 				}
 			} else {
-				AddLog(a, "Mounted to "+local)
+				AddInfoLog(a, "Mounted to "+local)
 				a.Preferences().SetBool("is_mounted", true)
 				updateMountBtn(a, btn)
 			}
@@ -217,10 +237,16 @@ func executeUnmount(a fyne.App, btn *widget.Button) {
 					client.SetSudoPassword("")
 					showSudoDialog(a, btn, "Incorrect password. Please try again.", false)
 				} else {
-					AddLog(a, "Unmount Error: "+err.Error())
+					cmdStr := ""
+					if runtime.GOOS == "windows" {
+						cmdStr = fmt.Sprintf(`net use %s /delete /y`, local)
+					} else {
+						cmdStr = fmt.Sprintf("sudo -S umount -l %s", local)
+					}
+					AddErrorLog(a, "Unmount Error: "+err.Error(), cmdStr, err.Error(), 0)
 				}
 			} else {
-				AddLog(a, "Unmounted from "+local)
+				AddInfoLog(a, "Unmounted from "+local)
 				a.Preferences().SetBool("is_mounted", false)
 				updateMountBtn(a, btn)
 			}
@@ -239,7 +265,7 @@ func startDashboardLoop(mainCtx context.Context, a fyne.App, c *client.HTTPClien
 		ip := a.Preferences().StringWithFallback("server_ip", "")
 		port := a.Preferences().StringWithFallback("server_port", "8080")
 		if ip == "" {
-			logMonitorErr(a, "Please set Server IP")
+			logMonitorErr(a, "Please set Server IP", "")
 			select {
 			case <-mainCtx.Done():
 				return
@@ -273,7 +299,8 @@ func startDashboardLoop(mainCtx context.Context, a fyne.App, c *client.HTTPClien
 			lastMonErr = ""
 			updateLabels(s, cpu, mem, temp)
 		}, func(err error) {
-			logMonitorErr(a, err.Error())
+			cmdStr := fmt.Sprintf("GET http://%s:%s/api/v1/monitor/stream", ip, port)
+			logMonitorErr(a, err.Error(), cmdStr)
 		})
 		
 		cancelStream()
@@ -298,16 +325,16 @@ func fetchAndUpdateDevs(a fyne.App, c *client.HTTPClient, ip, port string, devBo
 	}
 }
 
-func logMonitorErr(a fyne.App, e string) {
+func logMonitorErr(a fyne.App, e, cmd string) {
 	fyne.Do(func() {
 		if lastMonErr != e {
-			AddLog(a, "Monitor Error: "+e)
+			AddErrorLog(a, "Monitor Error: "+e, cmd, e, 0)
 			lastLogTime = time.Now()
 			noti := fyne.NewNotification("Error", "에러가 발생했습니다. Logs탭에서 확인해 주세요")
 			go a.SendNotification(noti)
 			lastMonErr = e
 		} else if time.Since(lastLogTime) > 10*time.Second {
-			AddLog(a, "Monitor Error: "+e)
+			AddErrorLog(a, "Monitor Error: "+e, cmd, e, 0)
 			lastLogTime = time.Now()
 		}
 	})

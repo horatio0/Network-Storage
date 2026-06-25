@@ -1,12 +1,17 @@
 package ui
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 
+	"network-storage-client/internal/client"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -21,7 +26,60 @@ func createSettingsView(a fyne.App) fyne.CanvasObject {
 		a.Preferences().SetString("app_password", pwd.Text)
 	})
 
-	return buildSettingsForm(ip, port, share, local, pwd, saveBtn)
+	debugMenu := fyne.NewMenu("",
+		&fyne.MenuItem{
+			Label: "Test Error",
+			ChildMenu: fyne.NewMenu("",
+				fyne.NewMenuItem("404 Not Found", func() {
+					go func() {
+						AddInfoLog(a, "Running Test Error...")
+						ipStr := a.Preferences().StringWithFallback("server_ip", "")
+						portStr := a.Preferences().StringWithFallback("server_port", "8080")
+						url := "http://" + ipStr + ":" + portStr + "/abcdef"
+						req, _ := http.NewRequest("GET", url, nil)
+						c := client.NewHTTPClient(a)
+						_, err := c.DoRequest(req)
+						if err != nil {
+							AddErrorLog(a, "404 Not Found test failed: "+err.Error(), "GET "+url, err.Error(), 1)
+						}
+					}()
+				}),
+				fyne.NewMenuItem("Mount Error", func() {
+					go func() {
+						AddInfoLog(a, "Running Test Error...")
+						ip := "255.255.255.255"
+						share := "invalid_share"
+						local := "/tmp/invalid_mount"
+						err := client.MountDrive(ip, share, local)
+						if err != nil {
+							cmdStr := ""
+							if runtime.GOOS == "windows" {
+								cmdStr = fmt.Sprintf(`net use %s \\%s\%s`, local, ip, share)
+							} else {
+								cmdStr = fmt.Sprintf("sudo -S mount -t nfs %s:%s %s", ip, share, local)
+							}
+							AddErrorLog(a, "Mount Error test failed: "+err.Error(), cmdStr, err.Error(), 1)
+						}
+					}()
+				}),
+				fyne.NewMenuItem("Network Error", func() {
+					go func() {
+						AddInfoLog(a, "Running Test Error...")
+						url := "http://255.255.255.255:8080/test"
+						req, _ := http.NewRequest("GET", url, nil)
+						c := client.NewHTTPClient(a)
+						_, err := c.DoRequest(req)
+						if err != nil {
+							AddErrorLog(a, "Network Error test failed: "+err.Error(), "GET "+url, err.Error(), 1)
+						}
+					}()
+				}),
+			),
+		},
+	)
+	debugBtn := newMenuButton("Debug Mode \u25be", debugMenu)
+
+	return buildSettingsForm(ip, port, share, local, pwd, saveBtn, debugBtn)
 }
 
 func newPrefEntry(a fyne.App, key, def string, isPwd bool) *widget.Entry {
@@ -42,9 +100,14 @@ func createSettingsEntries(a fyne.App) (*widget.Entry, *widget.Entry, *widget.En
 	return ip, port, share, local, pwd
 }
 
-func buildSettingsForm(ip, port, share, local, pwd *widget.Entry, saveBtn *widget.Button) fyne.CanvasObject {
-	return container.NewPadded(container.NewVBox(
+func buildSettingsForm(ip, port, share, local, pwd *widget.Entry, saveBtn *widget.Button, debugBtn *menuButton) fyne.CanvasObject {
+	header := container.NewHBox(
 		widget.NewLabelWithStyle("Server Config", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		layout.NewSpacer(),
+		debugBtn,
+	)
+	return container.NewPadded(container.NewVBox(
+		header,
 		widget.NewLabel("Tailscale IP:"), ip,
 		widget.NewLabel("Port:"), port,
 		widget.NewLabel("Share Name:"), share,
@@ -60,4 +123,20 @@ func getDefaultMountPath() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, "Documents", "HomeNAS")
+}
+
+type menuButton struct {
+	widget.Button
+	menu *fyne.Menu
+}
+
+func (b *menuButton) Tapped(e *fyne.PointEvent) {
+	widget.ShowPopUpMenuAtPosition(b.menu, fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), e.AbsolutePosition)
+}
+
+func newMenuButton(label string, menu *fyne.Menu) *menuButton {
+	b := &menuButton{menu: menu}
+	b.Text = label
+	b.ExtendBaseWidget(b)
+	return b
 }
