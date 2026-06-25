@@ -19,7 +19,9 @@ func createLockView(a fyne.App, w fyne.Window, main fyne.CanvasObject) fyne.Canv
 	errLbl.Alignment = fyne.TextAlignCenter
 
 	btn := widget.NewButton("Unlock", func() { handleUnlock(a, w, main, pwd, errLbl) })
-	box := container.NewVBox(widget.NewLabelWithStyle("App Locked", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), pwdWrap, btn, errLbl)
+	hintLbl := canvas.NewText("기본 비밀번호는 0000", color.NRGBA{R: 150, G: 150, B: 150, A: 255})
+	hintLbl.Alignment = fyne.TextAlignCenter
+	box := container.NewVBox(widget.NewLabelWithStyle("App Locked", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), pwdWrap, btn, errLbl, hintLbl)
 	return container.NewStack(bg, container.NewCenter(box))
 }
 

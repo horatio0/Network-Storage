@@ -22,17 +22,6 @@
 5. **시스템 모니터링**
    - 중앙 서버의 CPU, 메모리, 디스크 사용량 등 하드웨어 상태를 클라이언트 대시보드에서 실시간으로 확인할 수 있습니다.
 
----
-
-## ✨ 최근 주요 리팩토링 및 아키텍처 업데이트
-
-1. **코드베이스 최적화 (Codebase Cleanup)**: `backend/internal` 및 `fyne-frontend/internal`의 사용되지 않는 레거시 코드(`/hello` 등)를 제거하고, 스파게티 함수들을 작고 독립적인 모듈로 분리하여 코드 가독성과 유지보수성을 높였습니다.
-2. **터미널 WebSocket JSON Multiplexing**: 원격 터미널 통신을 원시 바이너리(Raw Binary)에서 구조화된 JSON 메시지(`{"type": "input", "data": ...}`, `{"type": "resize", "cols": ..., "rows": ...}`) 방식으로 업그레이드했습니다. 이를 통해 터미널 연결을 유지한 채로 동적 리사이징(Dynamic Resizing)을 완벽히 지원합니다.
-3. **프론트엔드 안정성 강화 (Frontend Stability)**: Deprecated된 Fyne API(`container.NewMax`)를 `container.NewStack`으로 대체하고, `staticcheck` 린트 오류를 수정했으며, 모든 경로 처리에 `path.Join`을 적용하여 크로스 플랫폼 파일 핸들링의 안정성을 확보했습니다.
-4. **아키텍처 분리 결정 (SSE vs WebSocket)**: 시스템 리소스 모니터링은 단방향 **SSE(Server-Sent Events)**로, 터미널 I/O는 양방향 **WebSocket**으로 통신 프로토콜을 명확히 분리했습니다. 터미널의 대용량 스트리밍으로 인해 모니터링 데이터가 지연되는 Head-of-line blocking 현상을 방지하고 채널별 에러 격리를 달성했습니다.
-
----
-
 ## 📸 스크린샷 (Screenshots)
 
 | 메인 대시보드 (Dashboard & Logs) | 파일 업/다운로드 (Files) | 원격 터미널 (WebTerminal) |

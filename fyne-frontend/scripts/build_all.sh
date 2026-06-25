@@ -24,20 +24,29 @@ mkdir -p release
 # 1. Build for Linux
 echo "----------------------------------------"
 echo "[1/3] Packaging for Linux..."
-/home/gyumin/go/bin/fyne package -os linux
+/home/gyumin/go/bin/fyne package -os linux -icon ./resources/Icon.png
 mv -f *.tar.xz release/
 
 # 2. Build for Windows
 echo "----------------------------------------"
 echo "[2/3] Packaging for Windows..."
-/home/gyumin/go/bin/fyne package -os windows
+if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+    echo "Error: x86_64-w64-mingw32-gcc not found."
+    echo "Please install the mingw-w64 package to build for Windows."
+    exit 1
+fi
+CC=x86_64-w64-mingw32-gcc /home/gyumin/go/bin/fyne package -os windows -icon ./resources/Icon.png
 mv -f *.exe release/
 
 # 3. Build for Android
 echo "----------------------------------------"
 echo "[3/3] Packaging for Android..."
-/home/gyumin/go/bin/fyne package -os android -appID com.network.storage.client
-mv -f *.apk release/
+if [ -z "$ANDROID_HOME" ] && [ -z "$ANDROID_NDK_HOME" ]; then
+    echo "Android SDK/NDK가 설정되지 않아 Android 빌드를 건너뜁니다."
+else
+    /home/gyumin/go/bin/fyne package -os android -appID com.network.storage.client -icon ./resources/Icon.png
+    mv -f *.apk release/
+fi
 
 echo "----------------------------------------"
 echo "Builds completed successfully!"

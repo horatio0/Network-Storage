@@ -28,7 +28,7 @@ func SetupMainWindow(a fyne.App, w fyne.Window, c *client.HTTPClient) {
 	setupLogCallback(a, contentArea, c, w)
 	handleSidebarSelect(0, a, contentArea, c, w)
 	mainLayout := container.NewBorder(nil, nil, sidebar, nil, contentArea)
-	w.SetContent(mainLayout)
+	w.SetContent(createLockView(a, w, mainLayout))
 }
 
 func setupLogCallback(a fyne.App, contentArea *fyne.Container, c *client.HTTPClient, w fyne.Window) {
